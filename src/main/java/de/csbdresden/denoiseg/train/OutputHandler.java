@@ -1,11 +1,17 @@
 package de.csbdresden.denoiseg.train;
 
-import de.csbdresden.denoiseg.util.N2VUtils;
+import io.scif.img.ImgSaver;
+import net.imagej.modelzoo.specification.DefaultModelSpecification;
+import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.img.Img;
+import net.imglib2.img.array.ArrayImg;
+import net.imglib2.img.array.ArrayImgFactory;
+import net.imglib2.loops.LoopBuilder;
 import net.imglib2.type.numeric.real.FloatType;
 import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.io.FileUtils;
+import org.scijava.Context;
 import org.tensorflow.Graph;
-import org.tensorflow.Output;
 import org.tensorflow.Session;
 import org.tensorflow.Tensor;
 import org.tensorflow.Tensors;
@@ -15,15 +21,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Date;
 
 public class OutputHandler {
+
 	private final DenoiSegConfig config;
 	private final DenoiSegTraining training;
 	private FloatType mean = new FloatType();
 
 	private FloatType stdDev = new FloatType();
 
-	private float currentLearningRate = 0.0004f;
+	private float currentLearningRate;
 	private float currentLoss = Float.MAX_VALUE;
 	private float currentDenoisegLoss = Float.MAX_VALUE;
 	private float currentDenoiseLoss = Float.MAX_VALUE;
@@ -36,22 +44,26 @@ public class OutputHandler {
 	private boolean noCheckpointSaved = true;
 	private Tensor< String > checkpointPrefix;
 	private boolean checkpointExists;
+	private ImgSaver imgSaver;
 
-	public OutputHandler(DenoiSegConfig config, DenoiSegTraining training) {
+	public OutputHandler(DenoiSegConfig config, DenoiSegTraining training, Context context) {
 		this.config = config;
 		this.currentLearningRate = config.getLearningRate();
 		this.training = training;
+		imgSaver = new ImgSaver(context);
 	}
 
 	public File exportLatestTrainedModel() throws IOException {
 		if(noCheckpointSaved) return null;
-		ModelSpecification.writeModelConfigFile(config, this, mostRecentModelDir, training.getStepsFinished());
-		return N2VUtils.saveTrainedModel(mostRecentModelDir);
+		DenoiSegModelSpecification spec = new DenoiSegModelSpecification();
+		spec.setName(new Date().toString() + " last checkpoint");
+		spec.writeModelConfigFile(config, this, mostRecentModelDir, training.getStepsFinished());
+		return TrainUtils.saveTrainedModel(mostRecentModelDir);
 	}
 
 	public File exportBestTrainedModel() throws IOException {
 		if(noCheckpointSaved) return null;
-		return N2VUtils.saveTrainedModel(bestModelDir);
+		return TrainUtils.saveTrainedModel(bestModelDir);
 	}
 
 	void copyBestModel(DenoiSegTraining training) {
@@ -59,7 +71,9 @@ public class OutputHandler {
 			bestValidationSegLoss = currentValidationSegLoss;
 			try {
 				FileUtils.copyDirectory(mostRecentModelDir, bestModelDir);
-				ModelSpecification.writeModelConfigFile(config, this, bestModelDir, training.getStepsFinished());
+				DenoiSegModelSpecification spec = new DenoiSegModelSpecification();
+				spec.setName(new Date().toString() + " lowest loss");
+				spec.writeModelConfigFile(config, this, bestModelDir, training.getStepsFinished());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -67,8 +81,8 @@ public class OutputHandler {
 	}
 
 	void createSavedModelDirs() throws IOException {
-		bestModelDir = Files.createTempDirectory("n2v-best-").toFile();
-		String checkpointDir = Files.createTempDirectory("n2v-latest-").toAbsolutePath().toString() + File.separator + "variables";
+		bestModelDir = Files.createTempDirectory("denoiseg-best-").toFile();
+		String checkpointDir = Files.createTempDirectory("denoiseg-latest-").toAbsolutePath().toString() + File.separator + "variables";
 		checkpointPrefix = Tensors.create(Paths.get(checkpointDir, "variables").toString());
 		mostRecentModelDir = new File(checkpointDir).getParentFile();
 
@@ -82,7 +96,7 @@ public class OutputHandler {
 
 	public void createSavedModelDirsFromExisting(File trainedModel) throws IOException {
 		mostRecentModelDir = trainedModel;
-		bestModelDir = Files.createTempDirectory("n2v-best-").toFile();
+		bestModelDir = Files.createTempDirectory("denoiseg-best-").toFile();
 		String checkpointDir = mostRecentModelDir.getAbsolutePath() + File.separator + "variables";
 		checkpointPrefix = Tensors.create(Paths.get(checkpointDir, "variables").toString());
 
@@ -97,19 +111,19 @@ public class OutputHandler {
 		String graphName = config.getTrainDimensions() == 2 ? "graph_2d.pb" : "graph_3d.pb";
 		byte[] graphDef = IOUtils.toByteArray( getClass().getResourceAsStream("/" + graphName) );
 		graph.importGraphDef( graphDef );
-		graph.operations().forEachRemaining( op -> {
-			for ( int i = 0; i < op.numOutputs(); i++ ) {
-				Output< Object > opOutput = op.output( i );
-				String name = opOutput.op().name();
-				System.out.println( name );
-			}
-		} );
+//		graph.operations().forEachRemaining( op -> {
+//			for ( int i = 0; i < op.numOutputs(); i++ ) {
+//				Output< Object > opOutput = op.output( i );
+//				String name = opOutput.op().name();
+//				System.out.println( name );
+//			}
+//		} );
 	}
 
 	File loadTrainedGraph(Graph graph, File zipFile) throws IOException {
 
-		File trainedModel = Files.createTempDirectory("n2v-imported-model").toFile();
-		N2VUtils.unZipAll(zipFile, trainedModel);
+		File trainedModel = Files.createTempDirectory("denoiseg-imported-model").toFile();
+		TrainUtils.unZipAll(zipFile, trainedModel);
 
 		byte[] graphDef = new byte[ 0 ];
 		try {
@@ -140,9 +154,21 @@ public class OutputHandler {
 		}
 	}
 
-	void saveCheckpoint(Session sess) {
+	void saveCheckpoint(Session sess, RandomAccessibleInterval<FloatType> input, RandomAccessibleInterval<FloatType> output) {
 		sess.runner().feed("save/Const", checkpointPrefix).addTarget("save/control_dependency").run();
 		noCheckpointSaved = false;
+		imgSaver.saveImg(new File(mostRecentModelDir, new DefaultModelSpecification().getTestInput()).getAbsolutePath(),
+				toImg(input));
+		imgSaver.saveImg(new File(mostRecentModelDir, new DefaultModelSpecification().getTestOutput()).getAbsolutePath(),
+				toImg(output));
+	}
+
+	private Img<?> toImg(RandomAccessibleInterval<FloatType> input) {
+		ArrayImg<FloatType, ?> res = new ArrayImgFactory<>(new FloatType()).create(input);
+		LoopBuilder.setImages(input, res).forEachPixel((in, out) -> {
+			out.set(in);
+		});
+		return res;
 	}
 
 	public float getCurrentSegLoss() {

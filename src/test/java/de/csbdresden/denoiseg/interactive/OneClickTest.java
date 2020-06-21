@@ -1,4 +1,4 @@
-package de.csbdresden.n2v.interactive;
+package de.csbdresden.denoiseg.interactive;
 
 import de.csbdresden.denoiseg.command.DenoiSegTrainPredictCommand;
 import net.imagej.ImageJ;
@@ -30,7 +30,7 @@ public class OneClickTest {
 					"mode3D", false,
 					"batchSize", 128,
 					"batchDimLength", 128,
-					"patchDimLength", 64).get();
+					"patchShape", 64).get();
 		}
 	}
 }

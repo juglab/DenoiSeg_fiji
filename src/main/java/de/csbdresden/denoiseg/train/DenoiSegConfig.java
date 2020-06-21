@@ -3,12 +3,12 @@ package de.csbdresden.denoiseg.train;
 public class DenoiSegConfig {
 	private int numEpochs = 300;
 	private int trainBatchSize = 180;
-	private int trainBatchDimLength = 180;
-	private int trainPatchDimLength = 60;
+	private int trainPatchShape = 60;
 	private int stepsPerEpoch = 200;
 	private int neighborhoodRadius = 5;
 	private int trainDimensions = 2;
 	private float learningRate = 0.0004f;
+	private int networkDepth = 4;
 
 	public DenoiSegConfig setStepsPerEpoch(final int steps) {
 		stepsPerEpoch = steps;
@@ -25,13 +25,8 @@ public class DenoiSegConfig {
 		return this;
 	}
 
-	public DenoiSegConfig setPatchDimLength(final int patchDimLength) {
-		trainPatchDimLength = patchDimLength;
-		return this;
-	}
-
-	public DenoiSegConfig setBatchDimLength(final int batchDimLength) {
-		trainBatchDimLength = batchDimLength;
+	public DenoiSegConfig setPatchShape(final int patchShape) {
+		trainPatchShape = patchShape;
 		return this;
 	}
 
@@ -61,12 +56,8 @@ public class DenoiSegConfig {
 		return trainBatchSize;
 	}
 
-	public long getTrainBatchDimLength() {
-		return trainBatchDimLength;
-	}
-
-	public long getTrainPatchDimLength() {
-		return trainPatchDimLength;
+	public long getTrainPatchShape() {
+		return trainPatchShape;
 	}
 
 	public int getNeighborhoodRadius() {
@@ -79,5 +70,13 @@ public class DenoiSegConfig {
 
 	public void setLearningRate(float learningRate) {
 		this.learningRate = learningRate;
+	}
+
+	public int getNetworkDepth() {
+		return networkDepth;
+	}
+
+	public void setNetworkDepth(int networkDepth) {
+		this.networkDepth = networkDepth;
 	}
 }
