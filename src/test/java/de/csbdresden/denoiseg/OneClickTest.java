@@ -26,9 +26,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  * #L%
  */
-package de.csbdresden.denoiseg.interactive;
+package de.csbdresden.denoiseg;
 
-import de.csbdresden.denoiseg.command.DenoiSegTrainPredictCommand;
 import de.csbdresden.denoiseg.train.DenoiSegConfig;
 import de.csbdresden.denoiseg.train.DenoiSegTraining;
 import net.imagej.ImageJ;
@@ -38,12 +37,10 @@ import net.imglib2.img.Img;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import org.junit.Test;
-import org.scijava.command.CommandModule;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.ExecutionException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -51,7 +48,7 @@ import static org.junit.Assert.assertNotNull;
 public class OneClickTest {
 
 	@Test
-	public void testTrainingAndPrediction() throws ExecutionException, InterruptedException, IOException {
+	public void testTrainingAndPrediction() throws IOException {
 
 		ImageJ ij = new ImageJ();
 		ij.ui().setHeadless(true);
