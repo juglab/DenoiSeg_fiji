@@ -53,5 +53,6 @@ public class OneClickTest {
 		Object model = ij.io().open(modelFile.getAbsolutePath());
 		assertNotNull(model);
 		assertEquals(DefaultModelZooArchive.class, model.getClass());
+		ij.context().dispose();
 	}
 }
