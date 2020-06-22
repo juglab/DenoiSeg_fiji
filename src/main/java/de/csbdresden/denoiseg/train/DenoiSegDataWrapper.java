@@ -98,13 +98,13 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 		Collections.shuffle(XY);
 	}
 
-	Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> getItem(int i, UIService uiService) {
+	Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> getItem(int i) {
 		int[] idx = new int[(int) Math.min(batchSize, size() - i*batchSize)];
 		for (int j = 0; j < idx.length; j++) {
 			idx[j] = i * batchSize + j;
 		}
 
-		Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> patches = subpatch_sampling(idx, uiService);
+		Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> patches = subpatch_sampling(idx);
 
 		RandomAccessibleInterval<T> patchX = patches.getA();
 		RandomAccessibleInterval<T> patchY = patches.getB();
@@ -254,7 +254,7 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 
 	}
 
-	private Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> subpatch_sampling(int[] idx, UIService uiService) {
+	private Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> subpatch_sampling(int[] idx) {
 
 		List<RandomAccessibleInterval<T>> X_Patches = new ArrayList<>();
 		List<RandomAccessibleInterval<T>> Y_Patches = new ArrayList<>();

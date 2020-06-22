@@ -231,8 +231,8 @@ public class DenoiSegTraining implements ModelZooTraining {
 					dialog.setTaskDone(0);
 					dialog.setTaskStart(1);
 				});
-				initPreviewHandler();
 			}
+			initPreviewHandler();
 
 			RemainingTimeEstimator timeEstimator = initTimeEstimator();
 
@@ -363,7 +363,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 	private void runEpochStep(Session sess, int i, int j, DenoiSegDataWrapper<FloatType> training_data, List<Double> losses) {
 		resetBatchIndexIfNeeded();
-		Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> item = training_data.getItem(index, uiService);
+		Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> item = training_data.getItem(index);
 		runTrainingOp(sess, item);
 		losses.add((double) output().getCurrentLoss());
 		logStatusInConsole(j + 1, config().getStepsPerEpoch());
@@ -408,7 +408,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 		XYPairs<FloatType> validationDataList = new XYPairs<>();
 		for (int i = 0; i < valData.numBatches(); i++) {
-			validationDataList.add(valData.getItem(i, uiService));
+			validationDataList.add(valData.getItem(i));
 		}
 		this.validationData = validationDataList;
 		validationTensorData = new ArrayList<>();
@@ -535,7 +535,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 			if(!headless() && i == 0) {
 				Tensor outputTensor = fetchedTensors.get(2);
 				RandomAccessibleInterval<FloatType> output = TensorFlowConverter.tensorToImage(outputTensor, getMapping());
-				previewHandler.updateValidationPreview(item.getA(), output);
+				previewHandler.updateValidationPreview(item.getA(), output, headless());
 //			updateHistoryImage(output);
 			}
 			fetchedTensors.forEach(Tensor::close);

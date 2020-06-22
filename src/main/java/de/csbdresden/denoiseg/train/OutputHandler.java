@@ -88,7 +88,7 @@ public class OutputHandler {
 
 		checkpointExists = false;
 
-		String predictionGraphDir = config.getTrainDimensions() == 2 ? "prediction_2d" : "prediction_3d";
+		String predictionGraphDir = config.getTrainDimensions() == 2 ? "denoiseg_prediction_2d" : "n2v_prediction_3d";
 		byte[] predictionGraphDef = IOUtils.toByteArray( getClass().getResourceAsStream("/" + predictionGraphDir + "/saved_model.pb") );
 		FileUtils.writeByteArrayToFile(new File(mostRecentModelDir, "saved_model.pb"), predictionGraphDef);
 		FileUtils.writeByteArrayToFile(new File(mostRecentModelDir, "training_model.pb"), predictionGraphDef);
@@ -108,7 +108,7 @@ public class OutputHandler {
 	}
 
 	void loadUntrainedGraph(Graph graph) throws IOException {
-		String graphName = config.getTrainDimensions() == 2 ? "graph_2d.pb" : "graph_3d.pb";
+		String graphName = config.getTrainDimensions() == 2 ? "denoiseg_graph_2d.pb" : "denoiseg_graph_3d.pb";
 		byte[] graphDef = IOUtils.toByteArray( getClass().getResourceAsStream("/" + graphName) );
 		graph.importGraphDef( graphDef );
 //		graph.operations().forEachRemaining( op -> {
@@ -157,10 +157,12 @@ public class OutputHandler {
 	void saveCheckpoint(Session sess, RandomAccessibleInterval<FloatType> input, RandomAccessibleInterval<FloatType> output) {
 		sess.runner().feed("save/Const", checkpointPrefix).addTarget("save/control_dependency").run();
 		noCheckpointSaved = false;
-		imgSaver.saveImg(new File(mostRecentModelDir, new DefaultModelSpecification().getTestInput()).getAbsolutePath(),
-				toImg(input));
-		imgSaver.saveImg(new File(mostRecentModelDir, new DefaultModelSpecification().getTestOutput()).getAbsolutePath(),
-				toImg(output));
+		if(input != null && output != null) {
+			imgSaver.saveImg(new File(mostRecentModelDir, new DefaultModelSpecification().getTestInput()).getAbsolutePath(),
+					toImg(input));
+			imgSaver.saveImg(new File(mostRecentModelDir, new DefaultModelSpecification().getTestOutput()).getAbsolutePath(),
+					toImg(output));
+		}
 	}
 
 	private Img<?> toImg(RandomAccessibleInterval<FloatType> input) {

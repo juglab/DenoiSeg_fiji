@@ -32,7 +32,7 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 	@Parameter
 	private RandomAccessibleInterval< T > input;
 
-	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch")
+	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch)")
 	private String axes = "XY";
 
 	@Parameter( type = ItemIO.OUTPUT )
@@ -107,8 +107,11 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 
 			RandomAccessibleInterval prediction = ij.op().copy().rai( _inputConverted );
 
-			CommandModule plugin = ij.command().run( DenoiSegPredictCommand.class, false,
-					"input", prediction, "modelFile", modelFile ).get();
+			ij.ui().show(prediction);
+
+			CommandModule plugin = ij.command().run( DenoiSegPredictCommand.class, true
+//					,"input", prediction, "modelFile", modelFile
+			).get();
 			ij.ui().show( plugin.getOutput( "output" ) );
 		} else
 			System.out.println( "Cannot find training image " + predictionInput.getAbsolutePath() );

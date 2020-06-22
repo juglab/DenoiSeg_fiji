@@ -177,6 +177,10 @@ public class InputHandler {
 	}
 
 	public void addValidationData(RandomAccessibleInterval<FloatType> validationRaw, RandomAccessibleInterval<IntType> validationLabeling) {
+		if(validationLabeling == null) {
+			logService.warn("Validation data without labeling is ignored (this will be improved in the future)");
+			return;
+		}
 
 		if (Thread.interrupted()) return;
 

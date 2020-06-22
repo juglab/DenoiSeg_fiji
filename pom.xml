@@ -81,8 +81,6 @@
 		<license.copyrightOwners>Deborah Schmidt</license.copyrightOwners>
 		<tensorflow.version>1.13.1</tensorflow.version>
 		<imagej-tensorflow.version>1.1.4</imagej-tensorflow.version>
-
-
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
 	</properties>
@@ -103,24 +101,15 @@
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej</artifactId>
 		</dependency>
-<!--		<dependency>-->
-<!--			<groupId>net.imagej</groupId>-->
-<!--			<artifactId>imagej-legacy</artifactId>-->
-<!--		</dependency>-->
-<!--		<dependency>-->
-<!--			<groupId>de.csbdresden</groupId>-->
-<!--			<artifactId>csbdeep</artifactId>-->
-<!--			<version>0.5.0</version>-->
-<!--		</dependency>-->
 		<dependency>
 			<groupId>de.csbdresden</groupId>
 			<artifactId>n2v</artifactId>
-			<version>0.2.1-frauzufall</version>
+			<version>0.3.0</version>
 		</dependency>
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej-modelzoo</artifactId>
-			<version>0.1.0-frauzufall</version>
+			<version>0.1.2</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-io</groupId>
@@ -130,13 +119,6 @@
 			<groupId>io.scif</groupId>
 			<artifactId>scifio</artifactId>
 		</dependency>
-		
-		<!-- Graphing dependency -->
-		<dependency>
-			<groupId>org.jfree</groupId>
-			<artifactId>jfreechart</artifactId>
-		</dependency>
-		
 		<!-- Test dependencies -->
 		<dependency>
 			<groupId>junit</groupId>

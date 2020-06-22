@@ -90,7 +90,7 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 		List<Integer> modelOutputOffset;
 		String modelNodeAxes;
 		int min = (int) Math.pow(2, config.getNetworkDepth());
-		int halo = 48;
+		int halo = 22;
 		if(config.getTrainDimensions() == 2) {
 			modelNodeAxes = "byxc";
 			modelInputMin = Arrays.asList(1, min, min, 1);
@@ -138,11 +138,6 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 	public static boolean setFromSpecification(DenoiSegPrediction prediction, ModelSpecification specification) {
 		double mean = 0.0f;
 		double stdDev = 1.0f;
-		int trainDimensions = 2;
-
-		if(specification.getInputs().size() != 1) {
-			trainDimensions = specification.getInputs().get(0).getAxes().length() == 4 ? 2 : 3;
-		}
 
 		List<TransformationSpecification> predictionPreprocessing = specification.getPredictionPreprocessing();
 		if(predictionPreprocessing.size() > 0) {
@@ -157,7 +152,6 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 
 		prediction.setMean(new FloatType((float) mean));
 		prediction.setStdDev(new FloatType((float) stdDev));
-		prediction.setTrainDimensions(trainDimensions);
 
 		return true;
 	}

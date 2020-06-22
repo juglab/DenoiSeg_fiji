@@ -12,6 +12,7 @@ import org.scijava.ItemVisibility;
 import org.scijava.command.Command;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.widget.NumberWidget;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +66,7 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 	@Parameter(label = "Batch size")
 	private int batchSize = 64;
 
-	@Parameter(label = "Patch shape")
+	@Parameter(label = "Patch shape", min = "16", max = "512", stepSize = "16", style= NumberWidget.SLIDER_STYLE)
 	private int patchShape = 64;
 
 	@Parameter(label = "Neighborhood radius")

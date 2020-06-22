@@ -7,14 +7,17 @@ import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.DefaultSingleImagePrediction;
 import net.imagej.modelzoo.consumer.ModelZooPrediction;
+import net.imagej.modelzoo.consumer.model.InputImageNode;
+import net.imagej.modelzoo.consumer.model.ModelZooAxis;
+import net.imagej.modelzoo.consumer.model.ModelZooModel;
 import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.numeric.real.FloatType;
-import net.imglib2.util.Intervals;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import org.scijava.Context;
+import org.scijava.log.LogService;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
@@ -27,7 +30,6 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 
 	private FloatType mean;
 	private FloatType stdDev;
-	private int trainDimensions = 2;
 
 	@Parameter
 	private OpService opService;
@@ -53,28 +55,50 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		this.stdDev = stdDev;
 	}
 
-	public void setTrainDimensions(int numDimensions) {
-		this.trainDimensions = numDimensions;
-	}
-
 	@Override
 	public void setInput(String name, RandomAccessibleInterval<?> value, String axes) {
-		preprocess(value, mean, stdDev);
+		preprocessInput(value, mean, stdDev);
 		super.setInput(name, value, axes);
 	}
 
 	@Override
-	public void run() throws FileNotFoundException, MissingLibraryException {
-		super.run();
-		RandomAccessibleInterval output = getOutput();
-		postprocess(output, mean, stdDev);
+	public void run() throws OutOfMemoryError, FileNotFoundException, MissingLibraryException {
+		//		super.run();
+		ModelZooModel model = loadModel(getTrainedModel());
+		if (model != null && model.isInitialized() && this.inputValidationAndMapping(model)) {
+			increaseHalo(model);
+			try {
+				this.preprocessing(model);
+				this.executePrediction(model);
+				this.postprocessing(model);
+			} finally {
+				model.dispose();
+			}
+
+		} else {
+			context.service(LogService.class).error("Model does not exist or cannot be loaded. Exiting.");
+			if (model != null) {
+				model.dispose();
+			}
+
+		}
+		postprocessOutput(getOutput(), mean, stdDev);
+
 	}
 
-	private void preprocess(RandomAccessibleInterval input, FloatType mean, FloatType stdDev) {
+	private void increaseHalo(ModelZooModel model) {
+		//TODO HACK to make tiling work. without increasing the halo the tiles become visible. something's calculated wrong at the border.
+		InputImageNode<?> inputNode = model.getInputNodes().get(0);
+		for (ModelZooAxis axis : inputNode.getAxes()) {
+			if(axis.getHalo() > 1) axis.setHalo(axis.getHalo()+32);
+		}
+	}
+
+	private void preprocessInput(RandomAccessibleInterval input, FloatType mean, FloatType stdDev) {
 		TrainUtils.normalizeInplace(input, mean, stdDev);
 	}
 
-	private void postprocess(RandomAccessibleInterval<FloatType> output, FloatType mean, FloatType stdDev) {
+	private void postprocessOutput(RandomAccessibleInterval<FloatType> output, FloatType mean, FloatType stdDev) {
 		// only denormalize first channel
 		IntervalView<FloatType> firstChannel = getFirstChannel(output);
 		TrainUtils.denormalizeInplace(firstChannel, mean, stdDev, opService);
@@ -88,29 +112,10 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 	}
 
 	public RandomAccessibleInterval<FloatType> predictPadded(RandomAccessibleInterval<FloatType> input, String axes) throws FileNotFoundException, MissingLibraryException {
-//		int padding = 32;
-//		IntervalView<FloatType> paddedInput = addPadding(input, padding);
 		setInput(input, axes);
 		run();
 		if(getOutput() == null) return null;
 		return getOutput();
-//		return removePadding(getOutput(), padding);
-	}
-
-	private IntervalView<FloatType> addPadding(RandomAccessibleInterval<FloatType> input, int padding) {
-		FinalInterval bigger = new FinalInterval(input);
-		for (int i = 0; i < trainDimensions; i++) {
-			bigger = Intervals.expand(bigger, padding, i);
-		}
-		return Views.zeroMin(Views.interval(Views.extendMirrorDouble(input), bigger));
-	}
-
-	private <T> RandomAccessibleInterval<T> removePadding(RandomAccessibleInterval<T> output, int padding) {
-		FinalInterval smaller = new FinalInterval(output);
-		for (int i = 0; i < trainDimensions; i++) {
-			smaller = Intervals.expand(smaller, -padding, i);
-		}
-		return Views.zeroMin(Views.interval(output, smaller));
 	}
 
 	public static void main( final String... args ) throws IOException, MissingLibraryException {

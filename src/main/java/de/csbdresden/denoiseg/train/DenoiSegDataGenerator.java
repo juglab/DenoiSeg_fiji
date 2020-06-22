@@ -258,12 +258,7 @@ public class DenoiSegDataGenerator {
 			int trainDimensions, long patchShape, Logger logger ) {
 
 		long superPatchShape = getSmallestInputDim(inputRAI, trainDimensions);
-		long batchDimLength = Math.max(superPatchShape, patchShape*2);
-
-		superPatchShape = Math.min(batchDimLength, superPatchShape);
-		if(superPatchShape < batchDimLength) {
-			logger.warn("Cannot create batches of edge length " + batchDimLength + ", max possible length is " + superPatchShape);
-		}
+		superPatchShape = Math.min(superPatchShape, patchShape*2);
 		long[] batchShapeData = new long[trainDimensions];
 		Arrays.fill(batchShapeData, superPatchShape);
 		FinalInterval batchShape = new FinalInterval(batchShapeData);

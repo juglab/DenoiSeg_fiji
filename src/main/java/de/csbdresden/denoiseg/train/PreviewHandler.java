@@ -36,10 +36,15 @@ public class PreviewHandler {
 		this.trainDimensions = trainDimensions;
 	}
 
-	public void updateValidationPreview(RandomAccessibleInterval<FloatType> in, RandomAccessibleInterval<FloatType> out) {
+	public void updateValidationPreview(RandomAccessibleInterval<FloatType> in, RandomAccessibleInterval<FloatType> out, boolean isHeadless) {
+
 		if (Thread.interrupted()) return;
+
 		singleValidationInputImage = Views.hyperSlice(in, in.numDimensions()-2, 0);
 		singleValidationOutputImage = Views.hyperSlice(out, out.numDimensions()-2, 0);
+
+		if(isHeadless) return;
+
 		long[] dims = new long[in.numDimensions()-1];
 		int channelCount = 5;
 		dims[0] = in.dimension(0)* channelCount;

@@ -23,9 +23,9 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	private String predictionLabel = "<html><br/><span style='font-weight: normal'>Prediction</span></html>";
 
 	@Parameter(label = "Raw prediction input image")
-	private Img predictionInput;
+	private RandomAccessibleInterval<FloatType> predictionInput;
 
-	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch")
+	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch)")
 	private String axes = "XY";
 
 	@Parameter( type = ItemIO.OUTPUT )
@@ -36,10 +36,9 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	@Override
 	public void run() {
 
-		System.out.println("Launching the DenoiSeg prediction command");
+		System.out.println("Launching the DenoiSeg train & predict command");
 
 		try {
-			System.out.println("Launching the DenoiSeg training command");
 
 			File latestModel = train();
 			if(latestModel == null) return;
