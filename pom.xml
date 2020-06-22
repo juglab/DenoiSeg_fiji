@@ -18,7 +18,7 @@
 	<url>http://csbdeep.bioimagecomputing.com/</url>
 	<inceptionYear>2019</inceptionYear>
 	<organization>
-		<name>Center for System Biology Dresden</name>
+		<name>Center for Systems Biology Dresden</name>
 		<url>http://www.csbdresden.de/</url>
 	</organization>
 	<licenses>
@@ -59,26 +59,26 @@
 	</mailingLists>
 
 	<scm>
-		<connection>scm:git:git://github.com/juglab/N2V_fiji</connection>
-		<developerConnection>scm:git:git@github.com:juglab/N2V_fiji</developerConnection>
+		<connection>scm:git:git://github.com/juglab/DenoiSeg_fiji</connection>
+		<developerConnection>scm:git:git@github.com:juglab/DenoiSeg_fiji</developerConnection>
 		<tag>HEAD</tag>
-		<url>https://github.com/juglab/N2V_fiji</url>
+		<url>https://github.com/juglab/DenoiSeg_fiji</url>
 	</scm>
 	<issueManagement>
 		<system>GitHub Issues</system>
-		<url>https://github.com/imagej/juglab/N2V_fiji/issues</url>
+		<url>https://github.com/imagej/juglab/DenoiSeg_fiji/issues</url>
 	</issueManagement>
 	<ciManagement>
 		<system>Travis CI</system>
-		<url>https://travis-ci.com/juglab/N2V_fiji</url>
+		<url>https://travis-ci.com/juglab/DenoiSeg_fiji</url>
 	</ciManagement>
 
 	<properties>
 		<package-name>mpicbg.csbd</package-name>
-		<!--<main-class>de.csbdresden.csbdeep.commands.GenericNetwork</main-class> -->
+		<main-class>de.csbdresden.denoiseg.predict.DenoiSegPrediction</main-class>
 		<!-- LICENSE -->
 		<license.licenseName>bsd_2</license.licenseName>
-		<license.copyrightOwners>Deborah Schmidt</license.copyrightOwners>
+		<license.copyrightOwners>Center for Systems Biology Dresden</license.copyrightOwners>
 		<tensorflow.version>1.13.1</tensorflow.version>
 		<imagej-tensorflow.version>1.1.4</imagej-tensorflow.version>
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
@@ -90,10 +90,6 @@
 			<id>scijava.public</id>
 			<url>https://maven.scijava.org/content/groups/public</url>
 		</repository>
-<!--		<repository>-->
-<!--			<id>jitpack.io</id>-->
-<!--			<url>https://jitpack.io</url>-->
-<!--		</repository>-->
 	</repositories>
 
 	<dependencies>
