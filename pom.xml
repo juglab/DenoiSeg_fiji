@@ -11,7 +11,7 @@
 
 	<groupId>de.csbdresden</groupId>
 	<artifactId>denoiseg</artifactId>
-	<version>0.1.0-SNAPSHOT</version>
+	<version>0.1.0</version>
 
 	<name>DenoiSeg plugin</name>
 	<description>DenoiSeg plugin</description>
@@ -61,7 +61,7 @@
 	<scm>
 		<connection>scm:git:git://github.com/juglab/DenoiSeg_fiji</connection>
 		<developerConnection>scm:git:git@github.com:juglab/DenoiSeg_fiji</developerConnection>
-		<tag>HEAD</tag>
+		<tag>denoiseg-0.1.0</tag>
 		<url>https://github.com/juglab/DenoiSeg_fiji</url>
 	</scm>
 	<issueManagement>
