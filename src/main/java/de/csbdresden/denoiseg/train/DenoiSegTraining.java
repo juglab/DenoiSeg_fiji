@@ -103,7 +103,8 @@ public class DenoiSegTraining implements ModelZooTraining {
 	private static final String trainingFetchDenoisegLossOp = "metrics/denoiseg/Mean_1";
 	private static final String trainingFetchSegLossOp = "metrics/seg_loss/Mean_1";
 	private static final String trainingFetchDenoiseLossOp = "metrics/denoise_loss/Mean";
-	private static final String trainingFetchLearningOp = "Adam/lr";
+	private static final String trainingFetchLearningOp = "Adam/lr/read";
+	private static final String lrAssignOpName = "Adam/lr";
 	// training target
 	private static final String trainingTargetOp = "training/group_deps";
 
@@ -176,6 +177,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 		logService.info( tensorFlowService.getStatus().getInfo() );
 
 		addCallbackOnEpochDone(new ReduceLearningRateOnPlateau()::reduceLearningRateOnPlateau);
+		addCallbackOnCancel(input()::cancel);
 
 	}
 
@@ -479,6 +481,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 		Tensor<Boolean> learningPhase = Tensors.create(true);
 		runner.feed(trainingFeedXOp, tensorX).feed(trainingFeedYOp, tensorY)
 				.feed(trainingFeedLearningPhaseOp, learningPhase)
+				.feed(lrAssignOpName, learningRate)
 				.feed(trainingFeedSampleWeightsOp, tensorWeights).addTarget(trainingTargetOp);
 		runner.fetch(trainingFetchLossOp);
 		runner.fetch(trainingFetchDenoisegLossOp);
@@ -635,6 +638,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 		onTrainingCanceled.forEach(TrainingCanceledCallback::accept);
 		if(future != null) future.cancel(true);
 		dispose();
+		if(getDialog() != null) getDialog().dispose();
 	}
 
 	public boolean isCanceled() {
@@ -662,7 +666,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 		DenoiSegTraining training = new DenoiSegTraining(ij.context());
 		training.init(new DenoiSegConfig()
 				.setNumEpochs(200)
-				.setStepsPerEpoch(200)
+				.setStepsPerEpoch(2)
 				.setBatchSize(32)
 				.setPatchShape(64));
 		training.input().addTrainingData(trainX, trainY);

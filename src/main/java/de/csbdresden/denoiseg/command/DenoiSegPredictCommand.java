@@ -43,6 +43,7 @@ import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.view.Views;
 import org.scijava.Context;
 import org.scijava.ItemIO;
+import org.scijava.ItemVisibility;
 import org.scijava.command.CommandModule;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
@@ -62,6 +63,21 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 
 	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch)")
 	private String axes = "XY";
+
+	@Parameter(required = false, visibility = ItemVisibility.MESSAGE)
+	private String batchLabel = "<html><div style='font-weight: normal;text-align:right;'>You can predict one dimension independently per position (e.g. the channel).<br>Use B ( = batch) for this dimension.</div><br></html>";
+
+	@Parameter(label = "Batch size", required = false)
+	private int batchSize = 10;
+
+	@Parameter(required = false, visibility = ItemVisibility.MESSAGE)
+	private String batchSizeLabel = "<html><div style='font-weight: normal;text-align:right;'>The batch size will only be used if a batch axis exists.<br>It can improve performance to process multiple batches at once (batch size > 1)</div><br></html>";
+
+	@Parameter(label = "Number of tiles (1 = no tiling)", required = false)
+	private int numTiles = 1;
+
+	@Parameter(required = false, visibility = ItemVisibility.MESSAGE)
+	private String numTilesLabel = "<html><div style='font-weight: normal;text-align:right;'>Increasing the tiling can help if the memory is insufficient to deal with the whole image at once.<br>Too many tiles decrease performance because an overlap has to be computed.</div><br></html>";
 
 	@Parameter( type = ItemIO.OUTPUT )
 	private Dataset output;
@@ -96,6 +112,8 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		prediction.setNumberOfTiles(numTiles);
+		prediction.setBatchSize(batchSize);
 		RandomAccessibleInterval<FloatType> converted = Converters.convert(input, new RealFloatConverter<>(), new FloatType());
 		converted = TrainUtils.copy(converted);
 //		output = Converters.convert(_output, new FloatRealConverter<>(), input.randomAccess().get());
@@ -106,6 +124,7 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 		} catch (FileNotFoundException | MissingLibraryException e) {
 			e.printStackTrace();
 		}
+		if(rai == null) return;
 		output = datasetService.create(rai);
 		output.setRGBMerged(false);
 

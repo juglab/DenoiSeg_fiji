@@ -93,22 +93,14 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 	public void run() throws OutOfMemoryError, FileNotFoundException, MissingLibraryException {
 		//		super.run();
 		ModelZooModel model = loadModel(getTrainedModel());
-		if (model != null && model.isInitialized() && this.inputValidationAndMapping(model)) {
-			increaseHalo(model);
-			try {
-				this.preprocessing(model);
-				this.executePrediction(model);
-				this.postprocessing(model);
-			} finally {
-				model.dispose();
-			}
-
-		} else {
-			context.service(LogService.class).error("Model does not exist or cannot be loaded. Exiting.");
-			if (model != null) {
-				model.dispose();
-			}
-
+		if (!validateModel(model)) return;
+		increaseHalo(model);
+		try {
+			this.preprocessing(model);
+			this.executePrediction(model);
+			this.postprocessing(model);
+		} finally {
+			model.dispose();
 		}
 		postprocessOutput(getOutput(), mean, stdDev);
 
@@ -128,6 +120,7 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 
 	private void postprocessOutput(RandomAccessibleInterval<FloatType> output, FloatType mean, FloatType stdDev) {
 		// only denormalize first channel
+		if(output == null) return;
 		IntervalView<FloatType> firstChannel = getFirstChannel(output);
 		TrainUtils.denormalizeInplace(firstChannel, mean, stdDev, opService);
 	}

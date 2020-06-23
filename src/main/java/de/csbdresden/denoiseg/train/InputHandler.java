@@ -83,6 +83,7 @@ public class InputHandler {
 	private final XYPairs<FloatType> validationData = new XYPairs<>();
 	private final XYPairs<FloatType> trainingData = new XYPairs<>();
 	private Collection subscribers;
+	private boolean canceled = false;
 
 	InputHandler(Context context, DenoiSegConfig config) {
 		this.config = config;
@@ -133,6 +134,7 @@ public class InputHandler {
 		unregisterIOEvent();
 
 		for (File file : trainingRawData.listFiles()) {
+			if(canceled) break;
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
 			Img image = (Img) ioService.open(file.getAbsolutePath());
@@ -147,6 +149,7 @@ public class InputHandler {
 
 	private RandomAccessibleInterval<IntType> getLabeling(File rawFile, File labelingDirectory) {
 		for (File labeling : labelingDirectory.listFiles()) {
+			if(canceled) break;
 			if(rawFile.getName().equals(labeling.getName())) {
 				try {
 					RandomAccessibleInterval label = (Img) ioService.open(labeling.getAbsolutePath());
@@ -193,6 +196,7 @@ public class InputHandler {
 		unregisterIOEvent();
 
 		for (File file : validationRawData.listFiles()) {
+			if(canceled) break;
 			if(file.isDirectory()) continue;
 			Img image = (Img) ioService.open(file.getAbsolutePath());
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, validationLabelingData);
@@ -256,5 +260,9 @@ public class InputHandler {
 
 	public XYPairs<FloatType> getLabeledTrainingPairs() {
 		return trainingLabeled;
+	}
+
+	public void cancel() {
+		this.canceled = true;
 	}
 }
