@@ -118,7 +118,7 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 		List<Integer> modelOutputOffset;
 		String modelNodeAxes;
 		int min = (int) Math.pow(2, config.getNetworkDepth());
-		int halo = 22;
+		int halo = 96;
 		if(config.getTrainDimensions() == 2) {
 			modelNodeAxes = "byxc";
 			modelInputMin = Arrays.asList(1, min, min, 1);

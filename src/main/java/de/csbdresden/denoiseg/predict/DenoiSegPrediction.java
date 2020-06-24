@@ -35,17 +35,14 @@ import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.DefaultSingleImagePrediction;
 import net.imagej.modelzoo.consumer.ModelZooPrediction;
-import net.imagej.modelzoo.consumer.model.InputImageNode;
-import net.imagej.modelzoo.consumer.model.ModelZooAxis;
-import net.imagej.modelzoo.consumer.model.ModelZooModel;
 import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.util.Intervals;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import org.scijava.Context;
-import org.scijava.log.LogService;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
@@ -91,27 +88,9 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 
 	@Override
 	public void run() throws OutOfMemoryError, FileNotFoundException, MissingLibraryException {
-		//		super.run();
-		ModelZooModel model = loadModel(getTrainedModel());
-		if (!validateModel(model)) return;
-		increaseHalo(model);
-		try {
-			this.preprocessing(model);
-			this.executePrediction(model);
-			this.postprocessing(model);
-		} finally {
-			model.dispose();
-		}
+		super.run();
 		postprocessOutput(getOutput(), mean, stdDev);
 
-	}
-
-	private void increaseHalo(ModelZooModel model) {
-		//TODO HACK to make tiling work. without increasing the halo the tiles become visible. something's calculated wrong at the border.
-		InputImageNode<?> inputNode = model.getInputNodes().get(0);
-		for (ModelZooAxis axis : inputNode.getAxes()) {
-			if(axis.getHalo() > 1) axis.setHalo(axis.getHalo()+32);
-		}
 	}
 
 	private void preprocessInput(RandomAccessibleInterval input, FloatType mean, FloatType stdDev) {
@@ -123,6 +102,11 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		if(output == null) return;
 		IntervalView<FloatType> firstChannel = getFirstChannel(output);
 		TrainUtils.denormalizeInplace(firstChannel, mean, stdDev, opService);
+		IntervalView<FloatType> predictionChannels = getPredictionChannels(output);
+		predictionChannels.forEach(pixel -> {
+			if(pixel.get() < 0) pixel.set(0);
+			if(pixel.get() > 1) pixel.set(1);
+		});
 	}
 
 	private IntervalView<FloatType> getFirstChannel(RandomAccessibleInterval<FloatType> output) {
@@ -130,6 +114,17 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		output.dimensions(dims);
 		dims[dims.length-1] = 1;
 		return Views.interval(output, new FinalInterval(dims));
+	}
+
+	private IntervalView<FloatType> getPredictionChannels(RandomAccessibleInterval<FloatType> output) {
+		long[] minmax = new long[output.numDimensions()*2];
+		for (int i = 0; i < output.numDimensions()-1; i++) {
+			minmax[i] = 0;
+			minmax[i+output.numDimensions()] = output.dimension(i);
+		}
+		minmax[output.numDimensions()-1] = 1;
+		minmax[output.numDimensions()*2-1] = 3;
+		return Views.interval(output, Intervals.createMinSize(minmax));
 	}
 
 	public RandomAccessibleInterval<FloatType> predictPadded(RandomAccessibleInterval<FloatType> input, String axes) throws FileNotFoundException, MissingLibraryException {

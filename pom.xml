@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.scijava</groupId>
 		<artifactId>pom-scijava</artifactId>
-		<version>27.0.1</version>
+		<version>29.0.0-beta-3</version>
 		<relativePath />
 	</parent>
 
@@ -79,8 +79,8 @@
 		<!-- LICENSE -->
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Center for Systems Biology Dresden</license.copyrightOwners>
-		<tensorflow.version>1.13.1</tensorflow.version>
-		<imagej-tensorflow.version>1.1.4</imagej-tensorflow.version>
+		<tensorflow.version>1.15.0</tensorflow.version>
+		<imagej-tensorflow.version>1.1.5</imagej-tensorflow.version>
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
 	</properties>
@@ -100,12 +100,12 @@
 		<dependency>
 			<groupId>de.csbdresden</groupId>
 			<artifactId>n2v</artifactId>
-			<version>0.3.0</version>
+			<version>0.3.3</version>
 		</dependency>
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej-modelzoo</artifactId>
-			<version>0.1.4</version>
+			<version>0.1.5</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-io</groupId>
@@ -114,6 +114,10 @@
 		<dependency>
 			<groupId>io.scif</groupId>
 			<artifactId>scifio</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.imagej</groupId>
+			<artifactId>imagej-tensorflow</artifactId>
 		</dependency>
 		<!-- Test dependencies -->
 		<dependency>
