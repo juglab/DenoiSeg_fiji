@@ -82,6 +82,7 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 
 	@Override
 	public void setInput(String name, RandomAccessibleInterval<?> value, String axes) {
+		value = opService.copy().rai(value);
 		preprocessInput(value, mean, stdDev);
 		super.setInput(name, value, axes);
 	}
@@ -127,7 +128,7 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		return Views.interval(output, Intervals.createMinSize(minmax));
 	}
 
-	public RandomAccessibleInterval<FloatType> predictPadded(RandomAccessibleInterval<FloatType> input, String axes) throws FileNotFoundException, MissingLibraryException {
+	public RandomAccessibleInterval<FloatType> predict(RandomAccessibleInterval<FloatType> input, String axes) throws FileNotFoundException, MissingLibraryException {
 		setInput(input, axes);
 		run();
 		if(getOutput() == null) return null;
@@ -147,9 +148,7 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		DenoiSegPrediction prediction = new DenoiSegPrediction(ij.context());
 		prediction.setTrainedModel(modelFile);
 		prediction.setNumberOfTiles(1);
-		prediction.setInput(_inputConverted, "XY");
-		prediction.run();
-		RandomAccessibleInterval output = prediction.getOutput();
+		RandomAccessibleInterval output = prediction.predict(_inputConverted, "XY");
 		ij.ui().show( output );
 
 	}

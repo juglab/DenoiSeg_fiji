@@ -32,11 +32,11 @@ import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
 import io.scif.MissingLibraryException;
 import net.imagej.ImageJ;
 import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.img.Img;
 import net.imglib2.type.numeric.real.FloatType;
 import org.scijava.ItemIO;
 import org.scijava.ItemVisibility;
 import org.scijava.command.Command;
+import org.scijava.command.CommandModule;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
@@ -86,7 +86,7 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	private void predict() throws FileNotFoundException, MissingLibraryException {
 		DenoiSegPrediction prediction = new DenoiSegPrediction(context);
 		prediction.setTrainedModel(latestTrainedModel);
-		this.output = prediction.predictPadded(this.predictionInput, axes);
+		this.output = prediction.predict(this.predictionInput, axes);
 	}
 
 	private void cancel() {
@@ -121,11 +121,14 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 
 		final String predictionFile = "/home/random/Development/imagej/project/CSBDeep/data/DenoiSeg/data/mouse/Mouse_n10/X_test/img_1.tif";
 
-		ij.command().run( DenoiSegTrainPredictCommand.class, true,
+		Object img = ij.io().open(predictionFile);
+		ij.ui().show(img);
+		CommandModule res = ij.command().run(DenoiSegTrainPredictCommand.class, false,
 				"trainingRawData", trainX,
 				"trainingLabelingData", trainY,
 				"validationRawData", valX,
 				"validationLabelingData", valY,
-				"predictionInput", ij.io().open(predictionFile)).get();
+				"predictionInput", img).get();
+		ij.ui().show(res.getOutput("output"));
 	}
 }
