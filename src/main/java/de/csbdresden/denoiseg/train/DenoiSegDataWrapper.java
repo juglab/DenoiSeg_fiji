@@ -344,18 +344,7 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 	}
 
 	private RandomAccessibleInterval<T> getPatchLabeling(RandomAccessibleInterval<T> source, FinalInterval interval) {
-//		System.out.println("source: " + Arrays.toString(Intervals.dimensionsAsIntArray(source)));
-//		System.out.println("interval: " + Arrays.toString(Intervals.dimensionsAsIntArray(interval)));
-		Img<T> res = new ArrayImgFactory<>(source.randomAccess().get()).create(Views.zeroMin(Views.interval(source, interval)));
-		Cursor<T> inCursor = Views.zeroMin(Views.interval(source, interval)).localizingCursor();
-		RandomAccess<T> outRA = res.randomAccess();
-		while(inCursor.hasNext()) {
-			inCursor.next();
-			outRA.setPosition(inCursor);
-			outRA.get().set(inCursor.get());
-		}
-		return res;
-//		return opService.copy().rai(Views.zeroMin(Views.interval(source, interval)));
+		return Views.zeroMin(Views.interval(source, interval));
 	}
 
 }

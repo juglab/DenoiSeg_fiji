@@ -33,6 +33,7 @@ import net.imagej.modelzoo.consumer.converter.RealIntConverter;
 import net.imagej.ops.OpService;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.boundary.IntTypeBoundary;
+import net.imglib2.converter.Converter;
 import net.imglib2.converter.Converters;
 import net.imglib2.converter.RealFloatConverter;
 import net.imglib2.img.Img;
@@ -41,10 +42,12 @@ import net.imglib2.loops.LoopBuilder;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.util.Intervals;
 import net.imglib2.util.Pair;
 import net.imglib2.util.ValuePair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
+import net.imglib2.view.composite.Composite;
 import org.scijava.Context;
 import org.scijava.event.EventService;
 import org.scijava.io.IOService;
@@ -55,9 +58,11 @@ import org.scijava.plugin.Parameter;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public class InputHandler {
 
@@ -104,17 +109,32 @@ public class InputHandler {
 	}
 
 	private RandomAccessibleInterval<FloatType> convertToOneHot(RandomAccessibleInterval<IntType> labeling) {
-		RandomAccessibleInterval<FloatType> background = new ArrayImgFactory<>(new FloatType()).create(labeling);
-		RandomAccessibleInterval<FloatType> foreground = new ArrayImgFactory<>(new FloatType()).create(labeling);
-		RandomAccessibleInterval<FloatType> border = new ArrayImgFactory<>(new FloatType()).create(labeling);
-		IntTypeBoundary<IntType> boundary = new IntTypeBoundary<>(labeling);
-		LoopBuilder.setImages(labeling, boundary, border, background, foreground).forEachPixel((in, bound, bord, back, fore) -> {
-			if (bound.get() != 0) bord.setOne();
+		Converter<IntType, FloatType> borderConverter = (input, output) -> {
+			if(input.get() != 0) output.setOne();
+			else output.setZero();
+		};
+		Converter<Composite< IntType >, FloatType > backgroundConverter = (input, output) -> {
+			if(input.get(0).get() != 0) output.setZero();
 			else {
-				if (in.get() == 0) back.setOne();
-				else fore.setOne();
+				if(input.get(1).get() == 0) output.setOne();
+				else output.setZero();
 			}
-		});
+		};
+		Converter<Composite< IntType >, FloatType > foregroundConverter = (input, output) -> {
+			if(input.get(0).get() != 0) output.setZero();
+			else {
+				if(input.get(1).get() != 0) output.setOne();
+				else output.setZero();
+			}
+		};
+		RandomAccessibleInterval<IntType> intBorder = new ArrayImgFactory<>(new IntType()).create(labeling);
+		LoopBuilder.setImages(new IntTypeBoundary<>(labeling), intBorder).multiThreaded().forEachPixel((in, out) -> out.set(in));
+
+		RandomAccessibleInterval<FloatType> border = Converters.convert(intBorder, borderConverter, new FloatType());
+		RandomAccessibleInterval<FloatType> background = Converters.compose(
+				Arrays.asList(intBorder, labeling), backgroundConverter, new FloatType());
+		RandomAccessibleInterval<FloatType> foreground = Converters.compose(
+				Arrays.asList(intBorder, labeling), foregroundConverter, new FloatType());
 		return Views.stack(background, foreground, border);
 	}
 
@@ -147,6 +167,29 @@ public class InputHandler {
 		registerIOEvent();
 	}
 
+	public void addTrainingAndValidationData(File rawData, File labelingData) throws IOException {
+
+		logService.info( "Tile training and validation data.." );
+		if(dialog != null) dialog.setCurrentTaskMessage("Tiling training and validation data" );
+
+		unregisterIOEvent();
+
+		List<File> files = Arrays.asList(Objects.requireNonNull(rawData.listFiles()));
+		Collections.shuffle(files);
+		for (File file : files) {
+			if(canceled) break;
+			if(file.isDirectory()) continue;
+//					System.out.println(file.getAbsolutePath());
+			Img image = (Img) ioService.open(file.getAbsolutePath());
+			if(image == null) continue;
+			RandomAccessibleInterval<IntType> labeling = getLabeling(file, labelingData);
+			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
+			addTrainingAndValidationData(imageFloat, labeling);
+		}
+
+		registerIOEvent();
+	}
+
 	private RandomAccessibleInterval<IntType> getLabeling(File rawFile, File labelingDirectory) {
 		for (File labeling : labelingDirectory.listFiles()) {
 			if(canceled) break;
@@ -166,18 +209,51 @@ public class InputHandler {
 		return Converters.convert(img, new RealIntConverter<T>(), new IntType());
 	}
 
+	public void addTrainingAndValidationData(RandomAccessibleInterval<FloatType> raw, RandomAccessibleInterval<IntType> labeling) {
+
+		if (Thread.interrupted()) return;
+
+		logService.info("Training and validation image raw dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(raw)));
+//		logService.info("Training image labeling dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(labeling)));
+
+		if(labeling != null) {
+			RandomAccessibleInterval<FloatType> oneHot = convertToOneHot(labeling);
+			XYPairs<FloatType> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
+//			display(tiles);
+			int numValidation = (int) (tiles.size() * 0.05);
+			int i = 0;
+			for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> tile : tiles) {
+				RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(tile.getA());
+				RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(tile.getB());
+//				logService.info("Tile dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(channel0)));
+				if(i++ < numValidation) {
+					validationData.add(new ValuePair<>(channel0, channel1));
+				} else {
+					trainingLabeled.add(new ValuePair<>(channel0, channel1));
+				}
+			}
+		} else {
+			List<RandomAccessibleInterval<FloatType>> tiles = DenoiSegDataGenerator.createTiles(raw, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
+			for (RandomAccessibleInterval<FloatType> tile : tiles) {
+				trainingUnlabeled.add(addTwoDimensions(tile));
+			}
+		}
+	}
+
 	public void addTrainingData(RandomAccessibleInterval<FloatType> raw, RandomAccessibleInterval<IntType> labeling) {
 
 		if (Thread.interrupted()) return;
 
-//		logService.info("Training image dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(raw)));
+		logService.info("Training image raw dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(raw)));
+//		logService.info("Training image labeling dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(labeling)));
 
 		if(labeling != null) {
 			RandomAccessibleInterval<FloatType> oneHot = convertToOneHot(labeling);
-			List<Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>>> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
+			XYPairs<FloatType> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
 			for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> tile : tiles) {
 				RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(tile.getA());
 				RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(tile.getB());
+//				logService.info("Tile dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(channel0)));
 				trainingLabeled.add(new ValuePair<>(channel0, channel1));
 			}
 		} else {
@@ -222,6 +298,7 @@ public class InputHandler {
 
 		List<Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>>> tiles =
 				DenoiSegDataGenerator.createTiles(validationRaw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
+//		uiService.show(tiles);
 		for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> pair : tiles) {
 			RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(pair.getA());
 			RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(pair.getB());
@@ -235,8 +312,6 @@ public class InputHandler {
 	}
 
 	void finalizeTrainingData() {
-//		Collections.shuffle(trainingUnlabeled);
-//		Collections.shuffle(trainingLabeled);
 		Collections.shuffle(validationData);
 		trainingData.clear();
 		trainingData.addAll(trainingLabeled);

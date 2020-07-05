@@ -38,6 +38,7 @@ import net.imagej.modelzoo.consumer.ModelZooPrediction;
 import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Intervals;
 import net.imglib2.view.IntervalView;
@@ -51,7 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 @Plugin(type = ModelZooPrediction.class, name = "denoiseg")
-public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, FloatType> {
+public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleImagePrediction<T, FloatType> {
 
 	private FloatType mean;
 	private FloatType stdDev;
@@ -81,10 +82,8 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 	}
 
 	@Override
-	public void setInput(String name, RandomAccessibleInterval<?> value, String axes) {
-		value = opService.copy().rai(value);
-		preprocessInput(value, mean, stdDev);
-		super.setInput(name, value, axes);
+	public <T extends RealType<T>> void setInput(String name, RandomAccessibleInterval<T> value, String axes) {
+		super.setInput(name, TrainUtils.normalizeConverter(value, mean, stdDev), axes);
 	}
 
 	@Override
@@ -92,10 +91,6 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		super.run();
 		postprocessOutput(getOutput(), mean, stdDev);
 
-	}
-
-	private void preprocessInput(RandomAccessibleInterval input, FloatType mean, FloatType stdDev) {
-		TrainUtils.normalizeInplace(input, mean, stdDev);
 	}
 
 	private void postprocessOutput(RandomAccessibleInterval<FloatType> output, FloatType mean, FloatType stdDev) {
@@ -128,7 +123,7 @@ public class DenoiSegPrediction extends DefaultSingleImagePrediction<FloatType, 
 		return Views.interval(output, Intervals.createMinSize(minmax));
 	}
 
-	public RandomAccessibleInterval<FloatType> predict(RandomAccessibleInterval<FloatType> input, String axes) throws FileNotFoundException, MissingLibraryException {
+	public RandomAccessibleInterval<FloatType> predict(RandomAccessibleInterval<T> input, String axes) throws FileNotFoundException, MissingLibraryException {
 		setInput(input, axes);
 		run();
 		if(getOutput() == null) return null;

@@ -104,13 +104,11 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 		}
 		prediction.setNumberOfTiles(numTiles);
 		prediction.setBatchSize(batchSize);
-		RandomAccessibleInterval<FloatType> converted = Converters.convert(input, new RealFloatConverter<>(), new FloatType());
-		converted = TrainUtils.copy(converted);
 //		output = Converters.convert(_output, new FloatRealConverter<>(), input.randomAccess().get());
 //		prediction.predict(converted);
 		RandomAccessibleInterval<FloatType> rai = null;
 		try {
-			rai = prediction.predict(converted, axes);
+			rai = prediction.predict(input, axes);
 		} catch (FileNotFoundException | MissingLibraryException e) {
 			e.printStackTrace();
 		}

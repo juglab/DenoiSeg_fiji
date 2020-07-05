@@ -29,9 +29,12 @@
 package de.csbdresden.denoiseg.train;
 
 import net.imagej.ops.OpService;
+import net.imagej.ops.convert.RealTypeConverter;
 import net.imglib2.Cursor;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.converter.Converter;
+import net.imglib2.converter.Converters;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.loops.LoopBuilder;
@@ -39,6 +42,7 @@ import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Pair;
+import net.imglib2.util.ValuePair;
 import net.imglib2.view.Views;
 
 import java.io.BufferedInputStream;
@@ -56,11 +60,10 @@ import java.util.zip.ZipOutputStream;
 
 public class TrainUtils {
 
-	public static void normalizeInplace(RandomAccessibleInterval<FloatType> data, FloatType mean, FloatType stdDev) {
-		LoopBuilder.setImages( data ).forEachPixel( (pixel ) -> {
-			pixel.sub(mean);
-			pixel.div(stdDev);
-		} );
+	public static <T extends RealType<T>> RandomAccessibleInterval<FloatType> normalizeConverter(RandomAccessibleInterval<T> data, FloatType mean, FloatType stdDev) {
+		Converter<? super T, ? super FloatType> converter = (Converter<T, FloatType>) (input, output)
+				-> output.set(input.getRealFloat()*stdDev.get() + mean.get());
+		return Converters.convert(data, converter, new FloatType());
 	}
 
 	public static <T extends RealType<T>> void denormalizeInplace(RandomAccessibleInterval<T> input, T mean, T stdDev, OpService opService) {
@@ -193,13 +196,6 @@ public class TrainUtils {
 		System.out.println("Done Unzipping:" + source.getName());
 	}
 
-	public static void normalize(XYPairs<FloatType> data, FloatType mean, FloatType stdDev) {
-		for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> pair : data) {
-			normalizeInplace(pair.getA(), mean, stdDev);
-		}
-
-	}
-
 	public static <T extends RealType<T> & NativeType<T>> RandomAccessibleInterval<T> copy(RandomAccessibleInterval<T> img) {
 		Img<T> res = new ArrayImgFactory<>(img.randomAccess().get()).create(img);
 		Cursor<T> inCursor = Views.iterable(img).localizingCursor();
@@ -210,5 +206,13 @@ public class TrainUtils {
 			outRA.get().set(inCursor.get());
 		}
 		return res;
+	}
+
+	public static void normalize(XYPairs<FloatType> trainingData, FloatType mean, FloatType stdDev) {
+		for (int i = 0; i < trainingData.size(); i++) {
+			Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> pair = trainingData.get(i);
+			Pair newPair = new ValuePair(TrainUtils.normalizeConverter(pair.getA(), mean, stdDev), pair.getB());
+			trainingData.set(i, newPair);
+		}
 	}
 }

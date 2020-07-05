@@ -34,11 +34,13 @@ import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
+import net.imglib2.util.Intervals;
 import net.imglib2.util.Pair;
 import net.imglib2.util.ValuePair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import org.scijava.log.Logger;
+import org.scijava.ui.UIService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -164,7 +166,7 @@ public class DenoiSegDataGenerator {
 				IntervalView<T> labelingTile = Views.interval(labeling,
 						minLabeling,
 						maxLabeling);
-				res.add(new ValuePair<>(n2vTile, labelingTile));
+				res.add(new ValuePair<>(Views.zeroMin(n2vTile), Views.zeroMin(labelingTile)));
 			}
 		}
 	}
@@ -182,7 +184,7 @@ public class DenoiSegDataGenerator {
 				IntervalView<T> n2vTile = Views.interval(img,
 						min,
 						max);
-				res.add(n2vTile);
+				res.add(Views.zeroMin(n2vTile));
 			}
 		}
 	}
@@ -225,7 +227,7 @@ public class DenoiSegDataGenerator {
 					IntervalView<T> n2vTile = Views.interval(img,
 							min,
 							max);
-					res.add(n2vTile);
+					res.add(Views.zeroMin(n2vTile));
 				}
 			}
 		}
@@ -264,7 +266,7 @@ public class DenoiSegDataGenerator {
 	static XYPairs<FloatType> createTiles(
 			RandomAccessibleInterval< FloatType > inputRAI,
 			RandomAccessibleInterval<FloatType> labelingRAI,
-			int trainDimensions, long patchShape, Logger logger ) {
+			int trainDimensions, long patchShape, Logger logger) {
 
 		long superPatchShape = getSmallestInputDim(inputRAI, trainDimensions);
 		superPatchShape = Math.min(superPatchShape, patchShape*2);

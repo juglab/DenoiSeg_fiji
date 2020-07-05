@@ -423,6 +423,8 @@ public class DenoiSegTraining implements ModelZooTraining {
 	private void makeValidationData(double n2v_perc_pix) {
 		int n_train = input().getTrainingData().size();
 		int n_val = input().getValidationData().size();
+		System.out.println("Training data patches: " + n_train);
+		System.out.println("Validation data patches: " + n_val);
 		double frac_val = (1.0 * n_val) / (n_train + n_val);
 		double frac_warn = 0.05;
 		if (frac_val < frac_warn) {

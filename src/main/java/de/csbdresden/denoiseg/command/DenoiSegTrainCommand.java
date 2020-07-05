@@ -152,8 +152,13 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 
 //		training.confirmInputMatching("training", trainingRawData, trainingLabelingData);
 
-		training.input().addTrainingData(trainingRawData, trainingLabelingData);
-		training.input().addValidationData(validationRawData, validationLabelingData);
+		if(trainingRawData.getAbsolutePath().equals(validationRawData.getAbsolutePath()) &&
+				trainingLabelingData.getAbsolutePath().equals(validationLabelingData.getAbsolutePath())) {
+			training.input().addTrainingAndValidationData(trainingRawData, trainingLabelingData);
+		} else {
+			training.input().addTrainingData(trainingRawData, trainingLabelingData);
+			training.input().addValidationData(validationRawData, validationLabelingData);
+		}
 		training.train();
 		if(training.isCanceled()) cancel("");
 		return training.output().exportLatestTrainedModel();
