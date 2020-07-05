@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>org.scijava</groupId>
 		<artifactId>pom-scijava</artifactId>
-		<version>29.0.0-beta-3</version>
+		<version>27.0.1</version>
 		<relativePath />
 	</parent>
 
@@ -80,7 +80,7 @@
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>Center for Systems Biology Dresden</license.copyrightOwners>
 		<tensorflow.version>1.15.0</tensorflow.version>
-		<imagej-tensorflow.version>1.1.5</imagej-tensorflow.version>
+		<imagej-tensorflow.version>1.1.6</imagej-tensorflow.version>
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
 	</properties>
@@ -118,6 +118,12 @@
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej-tensorflow</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>com.miglayout</groupId>
+					<artifactId>miglayout-swing</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<!-- Test dependencies -->
 		<dependency>

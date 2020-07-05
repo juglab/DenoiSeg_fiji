@@ -128,7 +128,7 @@ public class InputHandler {
 			}
 		};
 		RandomAccessibleInterval<IntType> intBorder = new ArrayImgFactory<>(new IntType()).create(labeling);
-		LoopBuilder.setImages(new IntTypeBoundary<>(labeling), intBorder).multiThreaded().forEachPixel((in, out) -> out.set(in));
+		LoopBuilder.setImages(new IntTypeBoundary<>(labeling), intBorder).forEachPixel((in, out) -> out.set(in));
 
 		RandomAccessibleInterval<FloatType> border = Converters.convert(intBorder, borderConverter, new FloatType());
 		RandomAccessibleInterval<FloatType> background = Converters.compose(
