@@ -62,7 +62,7 @@ public class TrainUtils {
 
 	public static <T extends RealType<T>> RandomAccessibleInterval<FloatType> normalizeConverter(RandomAccessibleInterval<T> data, FloatType mean, FloatType stdDev) {
 		Converter<? super T, ? super FloatType> converter = (Converter<T, FloatType>) (input, output)
-				-> output.set(input.getRealFloat()*stdDev.get() + mean.get());
+				-> output.set((input.getRealFloat() - mean.get())/stdDev.get());
 		return Converters.convert(data, converter, new FloatType());
 	}
 
@@ -194,18 +194,6 @@ public class TrainUtils {
 			zip.close();
 		}
 		System.out.println("Done Unzipping:" + source.getName());
-	}
-
-	public static <T extends RealType<T> & NativeType<T>> RandomAccessibleInterval<T> copy(RandomAccessibleInterval<T> img) {
-		Img<T> res = new ArrayImgFactory<>(img.randomAccess().get()).create(img);
-		Cursor<T> inCursor = Views.iterable(img).localizingCursor();
-		RandomAccess<T> outRA = res.randomAccess();
-		while(inCursor.hasNext()) {
-			inCursor.next();
-			outRA.setPosition(inCursor);
-			outRA.get().set(inCursor.get());
-		}
-		return res;
 	}
 
 	public static void normalize(XYPairs<FloatType> trainingData, FloatType mean, FloatType stdDev) {
