@@ -11,7 +11,7 @@
 
 	<groupId>de.csbdresden</groupId>
 	<artifactId>denoiseg</artifactId>
-	<version>0.2.4-SNAPSHOT</version>
+	<version>0.2.5-SNAPSHOT</version>
 
 	<name>DenoiSeg plugin</name>
 	<description>DenoiSeg plugin</description>
