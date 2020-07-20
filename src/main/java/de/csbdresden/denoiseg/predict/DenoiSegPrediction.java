@@ -35,6 +35,7 @@ import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.DefaultSingleImagePrediction;
 import net.imagej.modelzoo.consumer.ModelZooPrediction;
+import net.imagej.modelzoo.consumer.SingleImagePrediction;
 import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccessibleInterval;
@@ -51,7 +52,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-@Plugin(type = ModelZooPrediction.class, name = "denoiseg")
+@Plugin(type = SingleImagePrediction.class, name = "denoiseg")
 public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleImagePrediction<T, FloatType> {
 
 	private FloatType mean;
