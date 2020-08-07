@@ -97,7 +97,7 @@ public class PreviewHandler {
 				source = Views.hyperSlice(out, dims.length, i-1);
 			}
 			LoopBuilder.setImages(Views.zeroMin(Views.interval(validationImage, interval)), source)
-					.forEachPixel(FloatType::set);
+					.multiThreaded().forEachPixel(FloatType::set);
 		}
 
 //		else LoopBuilder.setImages(splitImage, out).forEachPixel((o, i) -> o.set(i));

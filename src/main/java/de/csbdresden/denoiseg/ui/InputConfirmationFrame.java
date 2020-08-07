@@ -125,7 +125,7 @@ public class InputConfirmationFrame<T extends RealType<T> & NativeType<T>> exten
 			minSize[0] = i * tileDims[0];
 			FinalInterval interval = Intervals.createMinSize(minSize);
 			LoopBuilder.setImages(Views.zeroMin(Views.interval(res, interval)), tile)
-					.forEachPixel(net.imglib2.type.Type::set);
+					.multiThreaded().forEachPixel(net.imglib2.type.Type::set);
 		}
 		return res;
 	}
