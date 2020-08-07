@@ -481,10 +481,12 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 		Tensor<Float> learningRate = Tensors.create(output().getCurrentLearningRate());
 		Tensor<Boolean> learningPhase = Tensors.create(true);
-		runner.feed(trainingFeedXOp, tensorX).feed(trainingFeedYOp, tensorY)
+		runner.feed(trainingFeedXOp, tensorX)
+				.feed(trainingFeedYOp, tensorY)
 				.feed(trainingFeedLearningPhaseOp, learningPhase)
 				.feed(lrAssignOpName, learningRate)
-				.feed(trainingFeedSampleWeightsOp, tensorWeights).addTarget(trainingTargetOp);
+				.feed(trainingFeedSampleWeightsOp, tensorWeights)
+				.addTarget(trainingTargetOp);
 		runner.fetch(trainingFetchLossOp);
 		runner.fetch(trainingFetchDenoisegLossOp);
 		runner.fetch(trainingFetchDenoiseLossOp);
