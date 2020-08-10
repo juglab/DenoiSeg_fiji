@@ -29,7 +29,6 @@
 package de.csbdresden.denoiseg.command;
 
 import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
-import io.scif.MissingLibraryException;
 import net.imagej.ImageJ;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.numeric.real.FloatType;
@@ -41,8 +40,6 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 
 @Plugin( type = Command.class, menuPath = "Plugins>CSBDeep>DenoiSeg>DenoiSeg train + predict" )
 public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
@@ -74,7 +71,7 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 			openSavedModels(latestModel);
 			predict();
 			if(training.getDialog() != null) training.getDialog().setTaskDone(2);
-		} catch (IOException | MissingLibraryException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			training.getDialog().dispose();
 		} finally {
@@ -83,7 +80,7 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 
 	}
 
-	private void predict() throws FileNotFoundException, MissingLibraryException {
+	private void predict() throws Exception {
 		DenoiSegPrediction prediction = new DenoiSegPrediction(context);
 		prediction.setTrainedModel(latestTrainedModel);
 		this.output = prediction.predict(this.predictionInput, axes);

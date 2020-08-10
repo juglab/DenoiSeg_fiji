@@ -109,7 +109,7 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 		RandomAccessibleInterval<FloatType> rai = null;
 		try {
 			rai = prediction.predict(input, axes);
-		} catch (FileNotFoundException | MissingLibraryException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		if(rai == null) return;

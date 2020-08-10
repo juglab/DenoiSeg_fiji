@@ -30,11 +30,9 @@ package de.csbdresden.denoiseg.predict;
 
 import de.csbdresden.denoiseg.train.DenoiSegModelSpecification;
 import de.csbdresden.denoiseg.train.TrainUtils;
-import io.scif.MissingLibraryException;
 import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.DefaultSingleImagePrediction;
-import net.imagej.modelzoo.consumer.ModelZooPrediction;
 import net.imagej.modelzoo.consumer.SingleImagePrediction;
 import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
@@ -49,8 +47,6 @@ import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 
 @Plugin(type = SingleImagePrediction.class, name = "denoiseg")
 public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleImagePrediction<T, FloatType> {
@@ -88,7 +84,7 @@ public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleIma
 	}
 
 	@Override
-	public void run() throws OutOfMemoryError, FileNotFoundException, MissingLibraryException {
+	public void run() throws OutOfMemoryError, Exception {
 		super.run();
 		postprocessOutput(getOutput(), mean, stdDev);
 
@@ -124,14 +120,14 @@ public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleIma
 		return Views.interval(output, Intervals.createMinSize(minmax));
 	}
 
-	public RandomAccessibleInterval<FloatType> predict(RandomAccessibleInterval<T> input, String axes) throws FileNotFoundException, MissingLibraryException {
+	public RandomAccessibleInterval<FloatType> predict(RandomAccessibleInterval<T> input, String axes) throws Exception {
 		setInput(input, axes);
 		run();
 		if(getOutput() == null) return null;
 		return getOutput();
 	}
 
-	public static void main( final String... args ) throws IOException, MissingLibraryException {
+	public static void main( final String... args ) throws Exception {
 
 		final ImageJ ij = new ImageJ();
 		ij.launch( args );
