@@ -47,7 +47,7 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	@Parameter(required = false, visibility = ItemVisibility.MESSAGE)
 	private String predictionLabel = "<html><br/><span style='font-weight: normal'>Prediction</span></html>";
 
-	@Parameter(label = "Raw prediction input image")
+	@Parameter(label = "Raw prediction input image", persist = false)
 	private RandomAccessibleInterval<FloatType> predictionInput;
 
 	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch)")

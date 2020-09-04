@@ -57,7 +57,7 @@ public class DenoiSegPredictCommand<T extends RealType<T>> implements SingleImag
 	@Parameter(label = "Trained model file (.zip)")
 	private File modelFile;
 
-	@Parameter
+	@Parameter(persist = false)
 	private RandomAccessibleInterval< T > input;
 
 	@Parameter(label = "Axes of prediction input (subset of XYB, B = batch)", description = "<html>You can predict one dimension independently per position.<br>Use B ( = batch) for this dimension.")
