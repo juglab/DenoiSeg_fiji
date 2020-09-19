@@ -245,10 +245,6 @@ public class OutputHandler {
 		this.currentValidationSegLoss = loss;
 	}
 
-	public void dispose() {
-		if(checkpointPrefix != null) checkpointPrefix.close();
-	}
-
 	public void setCurrentDenoisegLoss(float loss) {
 		this.currentDenoisegLoss = loss;
 	}
@@ -263,5 +259,16 @@ public class OutputHandler {
 
 	public float getCurrentDenoiSegLoss() {
 		return currentDenoisegLoss;
+	}
+
+	public void dispose() {
+		if(checkpointPrefix != null) checkpointPrefix.close();
+		if(bestModelDir != null && bestModelDir.exists()) {
+			try {
+				FileUtils.deleteDirectory(bestModelDir);
+				FileUtils.deleteDirectory(mostRecentModelDir);
+			} catch (IOException ignored) {
+			}
+		}
 	}
 }
