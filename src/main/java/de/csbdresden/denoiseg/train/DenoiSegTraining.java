@@ -570,7 +570,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 			if(!headless() && i == 0) {
 				Tensor outputTensor = fetchedTensors.get(2);
 				RandomAccessibleInterval<FloatType> output = TensorFlowConverter.tensorToImage(outputTensor, getMapping());
-				previewHandler.updateValidationPreview(item.getA(), output, headless());
+				previewHandler.updateValidationPreview(denormalize(item.getA()), denormalize(output), headless());
 //			updateHistoryImage(output);
 			}
 			fetchedTensors.forEach(Tensor::close);
@@ -585,6 +585,10 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 		logService.info("\nValidation denoise loss: " + avgDenoiseLoss + " seg loss: " + avgSegLoss);
 		return avgDenoiseLoss;
+	}
+
+	private RandomAccessibleInterval<FloatType> denormalize(RandomAccessibleInterval<FloatType> img) {
+		return de.csbdresden.n2v.train.TrainUtils.denormalizeConverter(img, output().getMean(), output().getStdDev());
 	}
 
 	public int getStepsFinished() {
