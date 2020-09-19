@@ -34,6 +34,8 @@ import org.junit.Test;
 
 import java.io.IOException;
 
+import static org.junit.Assert.assertNotNull;
+
 public class OpenArchivedModel {
 	private ImageJ ij;
 
@@ -49,9 +51,12 @@ public class OpenArchivedModel {
 		ij.launch();
 
 		// resource paths
-		String modelPath = "/home/random/Documents/2020-06 NEUBIAS/models/denoiseg-mouse.bioimage.io.zip";
+		String modelPath = getClass().getResource("/denoiseg-dummy.bioimage.io.zip").getPath();
 
 		Object model = ij.io().open(modelPath);
+
+		assertNotNull(model);
+
 		ij.ui().show(model);
 
 	}

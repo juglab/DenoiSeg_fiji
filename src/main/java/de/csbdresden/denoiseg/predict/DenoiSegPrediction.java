@@ -33,6 +33,7 @@ import de.csbdresden.denoiseg.train.TrainUtils;
 import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.DefaultSingleImagePrediction;
+import net.imagej.modelzoo.consumer.SanityCheck;
 import net.imagej.modelzoo.consumer.SingleImagePrediction;
 import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
@@ -59,6 +60,9 @@ public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleIma
 
 	@Parameter
 	private Context context;
+
+	public DenoiSegPrediction() {
+	}
 
 	public DenoiSegPrediction(Context context) {
 		super(context);
@@ -120,14 +124,13 @@ public class DenoiSegPrediction <T extends RealType<T>> extends DefaultSingleIma
 		return Views.interval(output, Intervals.createMinSize(minmax));
 	}
 
-	public RandomAccessibleInterval<FloatType> predict(RandomAccessibleInterval<T> input, String axes) throws Exception {
-		setInput(input, axes);
-		run();
-		if(getOutput() == null) return null;
-		return getOutput();
+	@Override
+	public SanityCheck getSanityCheck() {
+		// there is no sanity check implemented for segmentation models yet
+		return null;
 	}
 
-	public static void main( final String... args ) throws Exception {
+	public static void main(final String... args ) throws Exception {
 
 		final ImageJ ij = new ImageJ();
 		ij.launch( args );

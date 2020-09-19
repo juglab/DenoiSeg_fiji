@@ -100,12 +100,12 @@
 		<dependency>
 			<groupId>de.csbdresden</groupId>
 			<artifactId>n2v</artifactId>
-			<version>0.5.0</version>
+			<version>0.7.0</version>
 		</dependency>
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej-modelzoo</artifactId>
-			<version>0.7.0</version>
+			<version>0.8.0</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-io</groupId>
