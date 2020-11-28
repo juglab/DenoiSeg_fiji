@@ -105,8 +105,8 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 	private void setInputsOutputs(DenoiSegConfig config, DenoiSegOutputHandler outputHandler) {
 		List<Integer> modelInputMin;
 		List<Integer> modelInputStep;
-		List<Integer> modelInputHalo;
 		List<Float> modelInputScale;
+		List<Integer> modelOutputHalo;
 		List<Float> modelOutputScaleDenoise;
 		List<Float> modelOutputScaleSegment;
 		List<Integer> modelOutputOffsetDenoise;
@@ -118,7 +118,7 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 			modelNodeAxes = "byxc";
 			modelInputMin = Arrays.asList(1, min, min, 1);
 			modelInputStep = Arrays.asList(1, min, min, 0);
-			modelInputHalo = Arrays.asList(0, halo, halo, 0);
+			modelOutputHalo = Arrays.asList(0, halo, halo, 0);
 			modelOutputScaleDenoise = Arrays.asList(1f, 1f, 1f, 1f);
 			modelOutputScaleSegment = Arrays.asList(1f, 1f, 1f, 1f);
 			modelOutputOffsetDenoise = Arrays.asList(0, 0, 0, 0);
@@ -127,7 +127,7 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 			modelNodeAxes = "bzyxc";
 			modelInputMin = Arrays.asList(1, min, min, min, 1);
 			modelInputStep = Arrays.asList(1, min, min, min, 0);
-			modelInputHalo = Arrays.asList(0, halo, halo, halo, 0);
+			modelOutputHalo = Arrays.asList(0, halo, halo, halo, 0);
 			modelOutputScaleDenoise = Arrays.asList(1f, 1f, 1f, 1f, 1f);
 			modelOutputScaleSegment = Arrays.asList(1f, 1f, 1f, 1f, 1f);
 			modelOutputOffsetDenoise = Arrays.asList(0, 0, 0, 0, 0);
@@ -138,7 +138,6 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 		inputNode.setAxes(modelNodeAxes);
 		inputNode.setDataType(modelDataType);
 		inputNode.setDataRange(modelInputDataRange);
-		inputNode.setHalo(modelInputHalo);
 		inputNode.setShapeMin(modelInputMin);
 		inputNode.setShapeStep(modelInputStep);
 		ZeroMeanUnitVarianceTransformation preprocessing = new ZeroMeanUnitVarianceTransformation();
@@ -150,6 +149,7 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 		OutputNodeSpecification denoiseOutput = new DefaultOutputNodeSpecification();
 		denoiseOutput.setName(modelOutputDenoiseName);
 		denoiseOutput.setAxes(modelNodeAxes);
+		denoiseOutput.setHalo(modelOutputHalo);
 		denoiseOutput.setDataType(modelDataType);
 		denoiseOutput.setDataRange(modelOutputDenoiseDataRange);
 		denoiseOutput.setShapeReferenceInput(modelInputName);
@@ -165,6 +165,7 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 		segmentOutput.setName(modelOutputSegmentName);
 		segmentOutput.setAxes(modelNodeAxes);
 		segmentOutput.setDataType(modelDataType);
+		segmentOutput.setHalo(modelOutputHalo);
 		segmentOutput.setDataRange(modelOutputDenoiseDataRange);
 		segmentOutput.setShapeReferenceInput(modelInputName);
 		segmentOutput.setShapeScale(modelOutputScaleSegment);
