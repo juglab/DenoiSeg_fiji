@@ -28,24 +28,18 @@
  */
 package de.csbdresden.denoiseg.train;
 
-import net.imagej.ops.OpService;
 import net.imglib2.FinalInterval;
-import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.loops.LoopBuilder;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Intervals;
-import net.imglib2.util.Pair;
-import net.imglib2.util.ValuePair;
 import net.imglib2.view.Views;
 import org.scijava.Context;
 import org.scijava.display.Display;
 import org.scijava.display.DisplayService;
 import org.scijava.plugin.Parameter;
 import org.scijava.ui.UIService;
-
-import java.util.Arrays;
 
 public class PreviewHandler {
 
@@ -56,22 +50,25 @@ public class PreviewHandler {
 	private RandomAccessibleInterval<FloatType> trainingImage;
 	private RandomAccessibleInterval<FloatType> validationImage;
 
-	private RandomAccessibleInterval<FloatType> singleValidationInputImage;
-	private RandomAccessibleInterval<FloatType> singleValidationOutputImage;
+	private RandomAccessibleInterval<FloatType> inputImage;
+	private RandomAccessibleInterval<FloatType> outputDenoiseImage;
+	private RandomAccessibleInterval<FloatType> outputSegmentImage;
 
 	public PreviewHandler(Context context, int trainDimensions) {
 		context.inject(this);
 		this.trainDimensions = trainDimensions;
 	}
 
-	public void updateValidationPreview(RandomAccessibleInterval<FloatType> in, RandomAccessibleInterval<FloatType> out, boolean isHeadless) {
+	public void updateValidationPreview(RandomAccessibleInterval<FloatType> in,
+	                                    RandomAccessibleInterval<FloatType> outDenoise,
+	                                    RandomAccessibleInterval<FloatType> outSegment,
+	                                    boolean isHeadless, DenoiSegOutputHandler outputHandler, boolean canceledOrStopped) {
 
 		if (Thread.interrupted()) return;
 
-		singleValidationInputImage = Views.hyperSlice(in, in.numDimensions()-2, 0);
-		singleValidationOutputImage = Views.hyperSlice(out, out.numDimensions()-2, 0);
+		setSamples(denormalize(in, outputHandler), denormalize(outDenoise, outputHandler), outSegment);
 
-		if(isHeadless) return;
+		if(isHeadless || canceledOrStopped) return;
 
 		long[] dims = new long[in.numDimensions()-1];
 		int channelCount = 5;
@@ -93,8 +90,11 @@ public class PreviewHandler {
 			RandomAccessibleInterval<FloatType> source;
 			if(i == 0) {
 				source = Views.hyperSlice(in, dims.length, 0);
-			} else {
-				source = Views.hyperSlice(out, dims.length, i-1);
+			} else if(i < 2) {
+				source = Views.hyperSlice(outDenoise, dims.length, i-1);
+			}
+			else {
+				source = Views.hyperSlice(outSegment, dims.length, i-2);
 			}
 			LoopBuilder.setImages(Views.zeroMin(Views.interval(validationImage, interval)), source)
 					.multiThreaded().forEachPixel(FloatType::set);
@@ -109,11 +109,25 @@ public class PreviewHandler {
 		else display.update();
 	}
 
-	RandomAccessibleInterval<FloatType> getExampleInput() {
-		return singleValidationInputImage;
+	private RandomAccessibleInterval<FloatType> denormalize(RandomAccessibleInterval<FloatType> img, DenoiSegOutputHandler outputHandler) {
+		return de.csbdresden.n2v.train.TrainUtils.denormalizeConverter(img, outputHandler.getMean(), outputHandler.getStdDev());
 	}
 
-	RandomAccessibleInterval<FloatType> getExampleOutput() {
-		return singleValidationOutputImage;
+	private void setSamples(RandomAccessibleInterval<FloatType> in, RandomAccessibleInterval<FloatType> outDenoise, RandomAccessibleInterval<FloatType> outSegment) {
+		inputImage = Views.hyperSlice(in, in.numDimensions()-2, 0);
+		outputDenoiseImage = outDenoise;
+		outputSegmentImage = outSegment;
+	}
+
+	RandomAccessibleInterval<FloatType> getExampleInput() {
+		return inputImage;
+	}
+
+	RandomAccessibleInterval<FloatType> getExampleOutputDenoise() {
+		return outputDenoiseImage;
+	}
+
+	RandomAccessibleInterval<FloatType> getExampleOutputSegment() {
+		return outputSegmentImage;
 	}
 }

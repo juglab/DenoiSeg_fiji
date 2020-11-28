@@ -82,9 +82,6 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 //	@Parameter(required = false, label = "Pretrained model file (.zip)")
 //	private File pretrainedNetwork;
 
-	@Parameter(required = false, visibility = ItemVisibility.MESSAGE)
-	private String advancedLabel = "<html><br/><span style='font-weight: normal'>Advanced options</span></html>";
-
 	@Parameter(label = "Number of epochs")
 	private int numEpochs = 300;
 
@@ -121,7 +118,7 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 		System.out.println("Launching the DenoiSeg training command");
 
 		try {
-			File savedModel = train();
+			File savedModel = train(false);
 			if(savedModel == null) return;
 			openSavedModels(savedModel);
 		} catch (IOException e) {
@@ -134,12 +131,12 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 	}
 
 	protected void openSavedModels(File savedModel) throws IOException {
-		latestTrainedModel = modelZooService.open(savedModel);
+		latestTrainedModel = modelZooService.io().open(savedModel);
 		savedModel = training.output().exportBestTrainedModel();
-		bestTrainedModel = modelZooService.open(savedModel);
+		bestTrainedModel = modelZooService.io().open(savedModel);
 	}
 
-	protected File train() throws IOException {
+	protected File train(boolean showPrediction) throws IOException {
 		training = new DenoiSegTraining(context);
 		training.addCallbackOnCancel(this::cancel);
 		training.init(new DenoiSegConfig()
@@ -148,7 +145,7 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 				.setBatchSize(batchSize)
 				.setPatchShape(patchShape)
 				.setNeighborhoodRadius(neighborhoodRadius));
-		if(training.getDialog() != null) training.getDialog().addTask( "Prediction" );
+		if(showPrediction && training.getDialog() != null) training.getDialog().addTask( "Prediction" );
 
 //		training.confirmInputMatching("training", trainingRawData, trainingLabelingData);
 
@@ -160,7 +157,10 @@ public class DenoiSegTrainCommand implements Command, Cancelable {
 			training.input().addValidationData(validationRawData, validationLabelingData);
 		}
 		training.train();
-		if(training.isCanceled()) cancel("");
+		if(training.isCanceled()) {
+			cancel("");
+			return null;
+		}
 		return training.output().exportLatestTrainedModel();
 	}
 

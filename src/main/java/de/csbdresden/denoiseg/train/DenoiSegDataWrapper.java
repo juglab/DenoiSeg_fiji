@@ -44,7 +44,6 @@ import net.imglib2.util.Pair;
 import net.imglib2.util.ValuePair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
-import org.scijava.ui.UIService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -54,7 +53,7 @@ import java.util.Random;
 
 public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 
-	private final XYPairs<T> XY;
+	private final TrainingDataCollection<T> XY;
 	private final int batchSize;
 	private final int batchDim;
 	private final Dimensions shape;
@@ -82,15 +81,15 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 		return c.accept(patch, coord);
 	}
 
-	DenoiSegDataWrapper(XYPairs<T> dataPairs, int batchSize, double perc_pix, Dimensions shape, int neighborhoodRadius, ValueManipulatorConsumer<T> manipulator) {
+	DenoiSegDataWrapper(TrainingDataCollection<T> dataPairs, int batchSize, double perc_pix, Dimensions shape, int neighborhoodRadius, ValueManipulatorConsumer<T> manipulator) {
 
-		XY = new XYPairs<>();
+		XY = new TrainingDataCollection<>();
 		XY.addAll(dataPairs);
 		this.local_sub_patch_radius = neighborhoodRadius;
 		this.batchSize = batchSize;
 		this.batchDim = shape.numDimensions();
 		this.shape = shape;
-		this.range = computeRange(dataPairs.get(0).getA(), shape);
+		this.range = computeRange(dataPairs.get(0).input, shape);
 		this.numChannels = 1;
 
 		long multiplyShape = getMultiplyShape(shape);
@@ -126,23 +125,22 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 		Collections.shuffle(XY);
 	}
 
-	Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> getItem(int i) {
+	ProcessedTrainingData<T> getItem(int i) {
 		int[] idx = new int[(int) Math.min(batchSize, size() - i*batchSize)];
 		for (int j = 0; j < idx.length; j++) {
 			idx[j] = i * batchSize + j;
 		}
 
-		Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> patches = subpatch_sampling(idx);
+		ProcessedTrainingData<T> patches = subpatch_sampling(idx);
 
-		RandomAccessibleInterval<T> patchX = patches.getA();
-		RandomAccessibleInterval<T> patchY = patches.getB();
-
+		RandomAccessibleInterval<T> patchX = patches.input;
+		RandomAccessibleInterval<T> patchYDenoise = patches.outDenoise;
 //		uiService.show(patchY);
 
 		for (int j = 0; j < patchX.dimension(batchDim); j++) {
 //            for c in range(self.n_chan):
 			IntervalView<T> patchXSlice = Views.hyperSlice(patchX, batchDim, j);
-			IntervalView<T> patchYSlice = Views.hyperSlice(patchY, batchDim, j);
+			IntervalView<T> patchYSlice = Views.hyperSlice(patchYDenoise, batchDim, j);
 			manipulateX(box_size, shape, patchXSlice, patchYSlice, numChannels, manipulator);
 		}
 		return patches;
@@ -282,10 +280,11 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 
 	}
 
-	private Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> subpatch_sampling(int[] idx) {
+	private ProcessedTrainingData<T> subpatch_sampling(int[] idx) {
 
-		List<RandomAccessibleInterval<T>> X_Patches = new ArrayList<>();
-		List<RandomAccessibleInterval<T>> Y_Patches = new ArrayList<>();
+		List<RandomAccessibleInterval<T>> xPatches = new ArrayList<>();
+		List<RandomAccessibleInterval<T>> yPatchesDenoise = new ArrayList<>();
+		List<RandomAccessibleInterval<T>> yPatchesSegment = new ArrayList<>();
 
 		Random r = new Random();
 		for (int i = 0; i < idx.length; i++) {
@@ -314,20 +313,23 @@ public class DenoiSegDataWrapper<T extends RealType<T> & NativeType<T>> {
 
 			endY[shape.numDimensions()+1] = 2; //TODO make multichannel work
 
-			RandomAccessibleInterval<T> patchX = getPatch(XY.get(batchIndex).getA(), new FinalInterval(startX, endX));
+			RandomAccessibleInterval<T> patchX = getPatch(XY.get(batchIndex).input, new FinalInterval(startX, endX));
 //			System.out.println(Arrays.toString(startX) + " " + Arrays.toString(endLabeling));
-			RandomAccessibleInterval<T> patchLabeling = getPatchLabeling(XY.get(batchIndex).getB(), new FinalInterval(startX, endLabeling));
-			X_Patches.add(patchX);
+			RandomAccessibleInterval<T> patchLabeling = getPatchLabeling(XY.get(batchIndex).outSegment, new FinalInterval(startX, endLabeling));
+			xPatches.add(patchX);
 			FinalDimensions dimY = new FinalDimensions(endY);
 //			Y_Patches.add(opService.create().img(dimY, patchX.randomAccess().get()));
 			RandomAccessibleInterval<T> patchY = new ArrayImgFactory<>(patchX.randomAccess().get()).create(dimY);
 //			System.out.println(Arrays.toString(Intervals.dimensionsAsIntArray(patchLabeling)) + " " + Arrays.toString(Intervals.dimensionsAsIntArray(patchY)));
-			patchY = Views.concatenate(patchY.numDimensions() - 1, patchY, patchLabeling);
-			Y_Patches.add(patchY);
+			yPatchesDenoise.add(patchY);
+			yPatchesSegment.add(patchLabeling);
 //			if(i == 0) uiService.show(patchY);
 //	    Y_Batches[batchIndex] = Y[batchIndex, y_start:y_start + shape[0], x_start:x_start + shape[1]]
 		}
-		return new ValuePair<>(Views.concatenate(shape.numDimensions(), X_Patches), Views.concatenate(shape.numDimensions(), Y_Patches));
+		return new ProcessedTrainingData<>(
+				Views.concatenate(shape.numDimensions(), xPatches),
+				Views.concatenate(shape.numDimensions(), yPatchesDenoise),
+				Views.concatenate(shape.numDimensions(), yPatchesSegment));
 	}
 
 	private RandomAccessibleInterval<T> getPatch(RandomAccessibleInterval<T> source, FinalInterval interval) {

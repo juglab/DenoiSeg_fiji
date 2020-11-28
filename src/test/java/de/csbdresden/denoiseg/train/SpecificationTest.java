@@ -28,6 +28,8 @@
  */
 package de.csbdresden.denoiseg.train;
 
+import io.bioimage.specification.io.SpecificationReader;
+import io.bioimage.specification.io.SpecificationWriter;
 import net.imagej.ImageJ;
 import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.type.numeric.integer.IntType;
@@ -57,18 +59,18 @@ public class SpecificationTest {
 		training.train();
 		File savedModel = training.output().exportLatestTrainedModel();
 		DenoiSegModelSpecification spec = new DenoiSegModelSpecification();
-		spec.readFromZIP(savedModel);
+		SpecificationReader.readFromZIP(savedModel, spec);
 		File tmpDir = Files.createTempDirectory("denoiseg-spec-test").toFile();
-		spec.write(tmpDir);
-		String content = FileUtils.readFileToString(new File(tmpDir, spec.getModelFileName()));
+		SpecificationWriter.write(spec, tmpDir);
+		String content = FileUtils.readFileToString(new File(tmpDir, SpecificationWriter.getModelFileName()));
 		System.out.println(content);
 	}
 
 	public static void main(String... args) throws IOException {
 		DenoiSegModelSpecification spec = new DenoiSegModelSpecification();
 		File tmpDir = Files.createTempDirectory("denoiseg-spec-test").toFile();
-		spec.write(tmpDir);
-		String content = FileUtils.readFileToString(new File(tmpDir, spec.getModelFileName()));
+		SpecificationWriter.write(spec, tmpDir);
+		String content = FileUtils.readFileToString(new File(tmpDir, SpecificationWriter.getModelFileName()));
 		System.out.println(content);
 	}
 

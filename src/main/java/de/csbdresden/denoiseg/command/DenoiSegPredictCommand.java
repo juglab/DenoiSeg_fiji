@@ -28,19 +28,60 @@
  */
 package de.csbdresden.denoiseg.command;
 
+import de.csbdresden.denoiseg.predict.DenoiSegOutput;
 import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
-import net.imagej.modelzoo.consumer.commands.DefaultModelZooPredictionCommand;
-import net.imagej.modelzoo.consumer.commands.SingleImagePredictionCommand;
+import de.csbdresden.denoiseg.predict.DeprecatedDenoiSegPrediction;
+import net.imagej.Dataset;
+import net.imagej.DatasetService;
+import net.imagej.modelzoo.consumer.command.AbstractSingleImagePredictionCommand;
+import net.imagej.modelzoo.consumer.command.SingleImagePredictionCommand;
+import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
+import org.scijava.ItemIO;
+import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
+import java.io.IOException;
+
 @Plugin( type = SingleImagePredictionCommand.class, name = "denoiseg", menuPath = "Plugins>CSBDeep>DenoiSeg>DenoiSeg predict" )
-public class DenoiSegPredictCommand<T extends RealType<T>> extends DefaultModelZooPredictionCommand {
+public class DenoiSegPredictCommand<T extends RealType<T> & NativeType<T>> extends AbstractSingleImagePredictionCommand<T, DenoiSegPrediction> {
+
+	@Parameter(type = ItemIO.OUTPUT)
+	private Dataset denoised;
+
+	@Parameter(type = ItemIO.OUTPUT)
+	private Dataset segmented;
+
+	@Parameter
+	private DatasetService datasetService;
 
 	@Override
-	public void run() {
-		setPrediction(new DenoiSegPrediction(getContext()));
-		super.run();
-		getOutput().setRGBMerged(false);
+	protected DenoiSegPrediction createPrediction() {
+		try {
+			if(getArchive().getSpecification().getFormatVersion().compareTo("0.3.0") < 0) {
+				return new DeprecatedDenoiSegPrediction(getContext());
+			} else {
+				return new DenoiSegPrediction(getContext());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@Override
+	protected void createOutput(DenoiSegPrediction prediction) {
+		DenoiSegOutput<?, ?> output = prediction.getOutput();
+		denoised = datasetService.create(output.getDenoised());
+		segmented = datasetService.create(output.getSegmented());
+		segmented.setRGBMerged(false);
+	}
+
+	public static String getOutputSegmentedName() {
+		return "segmented";
+	}
+
+	public static String getOutputDenoisedName() {
+		return "denoised";
 	}
 }

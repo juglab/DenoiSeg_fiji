@@ -34,13 +34,11 @@ import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
-import net.imglib2.util.Intervals;
 import net.imglib2.util.Pair;
 import net.imglib2.util.ValuePair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import org.scijava.log.Logger;
-import org.scijava.ui.UIService;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,8 +46,8 @@ import java.util.List;
 
 public class DenoiSegDataGenerator {
 
-	static <T extends RealType<T> & NativeType<T>> void augment(XYPairs<T> data) {
-		if(data.get(0).getA().dimension(0) == data.get(0).getA().dimension(1)) {
+	static <T extends RealType<T> & NativeType<T>> void augment(TrainingDataCollection<T> data) {
+		if(data.get(0).input.dimension(0) == data.get(0).input.dimension(1)) {
 			//share in XY
 			augmentBatches(data);
 		}
@@ -63,12 +61,12 @@ public class DenoiSegDataGenerator {
 //		}
 	}
 
-	private static <T extends RealType<T>> XYPairs<T> extractBatches(
+	private static <T extends RealType<T>> TrainingDataCollection<T> extractBatches(
 			RandomAccessibleInterval<T> img,
 			RandomAccessibleInterval<T> labeling,
 			Interval shape) {
 		if(img.numDimensions() == shape.numDimensions()) return extractBatchesNoSlicing(img, labeling, shape);
-		XYPairs<T> res = new XYPairs<>();
+		TrainingDataCollection<T> res = new TrainingDataCollection<>();
 		for (int i = 0; i < img.dimension(shape.numDimensions()); i++) {
 			IntervalView<T> img1 = Views.hyperSlice(img, shape.numDimensions(), i);
 			IntervalView<T> labeling1 = Views.hyperSlice(labeling, shape.numDimensions(), i);
@@ -121,11 +119,11 @@ public class DenoiSegDataGenerator {
 		return res;
 	}
 
-	private static <T extends RealType<T>> XYPairs<T> extractBatchesNoSlicing(
+	private static <T extends RealType<T>> TrainingDataCollection<T> extractBatchesNoSlicing(
 			RandomAccessibleInterval<T> img,
 			RandomAccessibleInterval<T> labeling,
 			Interval shape) {
-		XYPairs<T> res = new XYPairs<>();
+		TrainingDataCollection<T> res = new TrainingDataCollection<>();
 		if(shapeTooBig(img, shape)) {
 			System.out.println("DenoiSegDataGenerator::extractPatchesNoSlicing: 'shape' is too big");
 			return res;
@@ -152,7 +150,7 @@ public class DenoiSegDataGenerator {
 			RandomAccessibleInterval<T> img,
 			RandomAccessibleInterval<T> labeling,
 			Interval shape,
-			XYPairs<T> res) {
+			TrainingDataCollection<T> res) {
 		for (int y = 0; y <= img.dimension(1) - shape.dimension(1); y+=shape.dimension(1)) {
 			for (int x = 0; x <= img.dimension(0) - shape.dimension(0); x+=shape.dimension(0)) {
 				long[] min = {x, y};
@@ -166,7 +164,7 @@ public class DenoiSegDataGenerator {
 				IntervalView<T> labelingTile = Views.interval(labeling,
 						minLabeling,
 						maxLabeling);
-				res.add(new ValuePair<>(Views.zeroMin(n2vTile), Views.zeroMin(labelingTile)));
+				res.add(new TrainingData<>(Views.zeroMin(n2vTile), Views.zeroMin(labelingTile)));
 			}
 		}
 	}
@@ -193,7 +191,7 @@ public class DenoiSegDataGenerator {
 			RandomAccessibleInterval<T> img,
 			RandomAccessibleInterval<T> labeling,
 			Interval shape,
-			XYPairs<T> res) {
+			TrainingDataCollection<T> res) {
 		for (int z = 0; z <= img.dimension(2) - shape.dimension(2); z+=shape.dimension(2)) {
 			for (int y = 0; y <= img.dimension(1) - shape.dimension(1); y += shape.dimension(1)) {
 				for (int x = 0; x <= img.dimension(0) - shape.dimension(0); x += shape.dimension(0)) {
@@ -208,7 +206,7 @@ public class DenoiSegDataGenerator {
 					IntervalView<T> labelingTile = Views.interval(labeling,
 							minLabeling,
 							maxLabeling);
-					res.add(new ValuePair<>(n2vTile, labelingTile));
+					res.add(new TrainingData<>(Views.zeroMin(n2vTile), Views.zeroMin(labelingTile)));
 				}
 			}
 		}
@@ -240,30 +238,30 @@ public class DenoiSegDataGenerator {
 		return false;
 	}
 
-	private static <T extends RealType<T>> void augmentBatches(XYPairs<T> patches) {
-		XYPairs<T> augmented = new XYPairs<>();
+	private static <T extends RealType<T>> void augmentBatches(TrainingDataCollection<T> patches) {
+		TrainingDataCollection<T> augmented = new TrainingDataCollection<>();
 		patches.forEach(patch -> {
-			IntervalView<T> r1A = Views.zeroMin(Views.rotate(patch.getA(), 0, 1));
-			IntervalView<T> r1B = Views.zeroMin(Views.rotate(patch.getB(), 0, 1));
+			IntervalView<T> r1A = Views.zeroMin(Views.rotate(patch.input, 0, 1));
+			IntervalView<T> r1B = Views.zeroMin(Views.rotate(patch.outSegment, 0, 1));
 			IntervalView<T> r2A = Views.zeroMin(Views.rotate(r1A, 0, 1));
 			IntervalView<T> r2B = Views.zeroMin(Views.rotate(r1B, 0, 1));
-			augmented.add(new ValuePair<>(r1A, r1B));
-			augmented.add(new ValuePair<>(r2A, r2B));
+			augmented.add(new TrainingData<>(r1A, r1B));
+			augmented.add(new TrainingData<>(r2A, r2B));
 			IntervalView<T> r3A = Views.zeroMin(Views.rotate(r2A, 0, 1));
 			IntervalView<T> r3B = Views.zeroMin(Views.rotate(r2B, 0, 1));
-			augmented.add(new ValuePair<>(r3A, r3B));
+			augmented.add(new TrainingData<>(r3A, r3B));
 		});
 		patches.addAll(augmented);
 		augmented.clear();
-		for (Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<T>> patch : patches) {
-			IntervalView<T> iA = Views.zeroMin(Views.invertAxis(patch.getA(), 0));
-			IntervalView<T> iB = Views.zeroMin(Views.invertAxis(patch.getB(), 0));
-			augmented.add(new ValuePair<>(iA, iB));
+		for (TrainingData<T> patch : patches) {
+			IntervalView<T> iA = Views.zeroMin(Views.invertAxis(patch.input, 0));
+			IntervalView<T> iB = Views.zeroMin(Views.invertAxis(patch.outSegment, 0));
+			augmented.add(new TrainingData<>(iA, iB));
 		}
 		patches.addAll(augmented);
 	}
 
-	static XYPairs<FloatType> createTiles(
+	static TrainingDataCollection<FloatType> createTiles(
 			RandomAccessibleInterval< FloatType > inputRAI,
 			RandomAccessibleInterval<FloatType> labelingRAI,
 			int trainDimensions, long patchShape, Logger logger) {

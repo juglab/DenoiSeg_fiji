@@ -28,7 +28,10 @@
  */
 package de.csbdresden.denoiseg.command;
 
-import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
+import de.csbdresden.denoiseg.predict.DenoiSegOutput;
+import de.csbdresden.denoiseg.predict.DeprecatedDenoiSegPrediction;
+import net.imagej.Dataset;
+import net.imagej.DatasetService;
 import net.imagej.ImageJ;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.numeric.real.FloatType;
@@ -54,7 +57,13 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	private String axes = "XY";
 
 	@Parameter( type = ItemIO.OUTPUT )
-	private RandomAccessibleInterval< FloatType > output;
+	private Dataset denoised;
+
+	@Parameter( type = ItemIO.OUTPUT )
+	private Dataset segmented;
+
+	@Parameter
+	private DatasetService datasetService;
 
 	private boolean canceled = false;
 
@@ -65,7 +74,7 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 
 		try {
 
-			File latestModel = train();
+			File latestModel = train(true);
 			if(latestModel == null) return;
 			if(training.getDialog() != null) training.getDialog().setTaskStart(2);
 			openSavedModels(latestModel);
@@ -81,9 +90,11 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	}
 
 	private void predict() throws Exception {
-		DenoiSegPrediction prediction = new DenoiSegPrediction(context);
+		DeprecatedDenoiSegPrediction prediction = new DeprecatedDenoiSegPrediction(context);
 		prediction.setTrainedModel(latestTrainedModel);
-		this.output = prediction.predict(this.predictionInput, axes);
+		DenoiSegOutput<?, ?> res = prediction.predict(this.predictionInput, axes);
+		this.denoised = datasetService.create(res.getDenoised());
+		this.segmented = datasetService.create(res.getSegmented());
 	}
 
 	private void cancel() {

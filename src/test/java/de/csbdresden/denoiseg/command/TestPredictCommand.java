@@ -53,7 +53,8 @@ public class TestPredictCommand {
 				,"input", _input, "modelFile", new File(modelPath)
 		).get();
 
-		assertNotNull( plugin.getOutput( "output" ) );
+		assertNotNull( plugin.getOutput(DenoiSegPredictCommand.getOutputSegmentedName()) );
+		assertNotNull( plugin.getOutput(DenoiSegPredictCommand.getOutputDenoisedName()) );
 
 		ij.dispose();
 

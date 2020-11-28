@@ -28,28 +28,27 @@
  */
 package de.csbdresden.denoiseg.train;
 
-import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
-import net.imagej.modelzoo.specification.CitationSpecification;
-import net.imagej.modelzoo.specification.DefaultCitationSpecification;
-import net.imagej.modelzoo.specification.DefaultInputNodeSpecification;
-import net.imagej.modelzoo.specification.DefaultModelSpecification;
-import net.imagej.modelzoo.specification.DefaultOutputNodeSpecification;
-import net.imagej.modelzoo.specification.DefaultTransformationSpecification;
-import net.imagej.modelzoo.specification.InputNodeSpecification;
-import net.imagej.modelzoo.specification.ModelSpecification;
-import net.imagej.modelzoo.specification.OutputNodeSpecification;
-import net.imagej.modelzoo.specification.TransformationSpecification;
-import net.imglib2.type.numeric.real.FloatType;
+import io.bioimage.specification.CitationSpecification;
+import io.bioimage.specification.DefaultCitationSpecification;
+import io.bioimage.specification.DefaultInputNodeSpecification;
+import io.bioimage.specification.DefaultOutputNodeSpecification;
+import io.bioimage.specification.InputNodeSpecification;
+import io.bioimage.specification.OutputNodeSpecification;
+import io.bioimage.specification.WeightsSpecification;
+import io.bioimage.specification.transformation.ClipTransformation;
+import io.bioimage.specification.transformation.ImageTransformation;
+import io.bioimage.specification.transformation.ScaleLinearTransformation;
+import io.bioimage.specification.transformation.ZeroMeanUnitVarianceTransformation;
+import io.bioimage.specification.weights.TensorFlowSavedModelBundleSpecification;
+import net.imagej.modelzoo.specification.ImageJModelSpecification;
 
-import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class DenoiSegModelSpecification extends DefaultModelSpecification {
+public class DenoiSegModelSpecification extends ImageJModelSpecification {
 
 	private final static String idTrainingKwargsTrainDimensions = "trainDimensions";
 	private final static String idTrainingKwargsLearningRate = "learningRate";
@@ -59,8 +58,6 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 	private final static String idTrainingKwargsPatchShape = "patchShape";
 	private final static String idTrainingKwargsNeighborhoodRadius = "neighborhoodRadius";
 	private final static String idTrainingKwargsStepsFinished = "stepsFinished";
-	private final static String idMean = "mean";
-	private final static String idStdDev = "stdDev";
 	private final static String citationText = "Tim-Oliver Buchholz and Mangal Prakash and Alexander Krull and Florian Jug. DenoiSeg: Joint Denoising and Segmentation. (2020)";
 	private final static String doiText = "https://arxiv.org/abs/2005.02987";
 	private final static List<String> tags = Arrays.asList("denoising", "segmentation", "unet2d");
@@ -69,35 +66,30 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 	private final static String modelInputName = DenoiSegTraining.predictionFeedInputOp;
 	private final static String modelDataType = "float32";
 	private final static List modelInputDataRange = Arrays.asList("-inf", "inf");
-	private final static List modelOutputDataRange = Arrays.asList("-inf", "inf");
-	private final static String modelOutputName = DenoiSegTraining.predictionTargetOp;
-	private final static String modelPreprocessing = DenoiSegPrediction.class.getCanonicalName() + "::preprocess";
-	private final static String modelPostprocessing = DenoiSegPrediction.class.getCanonicalName() + "::postprocess";
+	private final static List modelOutputDenoiseDataRange = Arrays.asList("-inf", "inf");
+	private final static List modelOutputSegmentDataRange = Arrays.asList(0, 1);
+	private final static String modelOutputSegmentName = DenoiSegTraining.predictionTargetSegmentOp;
+	private final static String modelOutputDenoiseName = DenoiSegTraining.predictionTargetDenoiseOp;
 
-	void writeModelConfigFile(DenoiSegConfig config, OutputHandler outputHandler, File targetDirectory, int stepsFinished) throws IOException {
-		setMeta();
-		setInputsOutputs(config);
-		setTraining(config, stepsFinished);
-		setPrediction(outputHandler);
-		super.write(targetDirectory);
+	DenoiSegModelSpecification() {
+		super();
 	}
 
-	private void setPrediction(OutputHandler outputHandler) {
-		TransformationSpecification preprocessing = new DefaultTransformationSpecification();
-		preprocessing.setSpec(modelPreprocessing);
-		Map<String, Object> normalizeArgs = new LinkedHashMap<>();
-		normalizeArgs.put(idMean, Collections.singletonList(outputHandler.getMean().get()));
-		normalizeArgs.put(idStdDev, Collections.singletonList(outputHandler.getStdDev().get()));
-		preprocessing.setKwargs(new LinkedHashMap<>(normalizeArgs));
-		addPredictionPreprocessing(preprocessing);
-		TransformationSpecification postprocessing = new DefaultTransformationSpecification();
-		postprocessing.setSpec(modelPostprocessing);
-		postprocessing.setKwargs(new LinkedHashMap<>(normalizeArgs));
-		addPredictionPostprocessing(postprocessing);
+	void update(DenoiSegConfig config, DenoiSegOutputHandler outputHandler, int stepsFinished) {
+		setMeta(outputHandler);
+		setInputsOutputs(config, outputHandler);
+		setTraining(config, stepsFinished);
+		setWeights(outputHandler);
+	}
+
+	private void setWeights(DenoiSegOutputHandler outputHandler) {
+		WeightsSpecification weights = new TensorFlowSavedModelBundleSpecification();
+		weights.setSource(outputHandler.getSavedModelBundlePackage());
+		addWeights(weights);
 	}
 
 	private void setTraining(DenoiSegConfig config, int stepsFinished) {
-		setTrainingSource(modelTrainingSource);
+		String trainingSource = modelTrainingSource;
 		Map<String, Object> trainingKwargs = new LinkedHashMap<>();
 		trainingKwargs.put(idTrainingKwargsBatchSize, config.getTrainBatchSize());
 		trainingKwargs.put(idTrainingKwargsLearningRate, config.getLearningRate());
@@ -107,15 +99,18 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 		trainingKwargs.put(idTrainingKwargsNumStepsPerEpoch, config.getStepsPerEpoch());
 		trainingKwargs.put(idTrainingKwargsPatchShape, config.getTrainPatchShape());
 		trainingKwargs.put(idTrainingKwargsStepsFinished, stepsFinished);
-		setTrainingKwargs(trainingKwargs);
+		setTrainingStats(trainingSource, trainingKwargs);
 	}
 
-	private void setInputsOutputs(DenoiSegConfig config) {
+	private void setInputsOutputs(DenoiSegConfig config, DenoiSegOutputHandler outputHandler) {
 		List<Integer> modelInputMin;
 		List<Integer> modelInputStep;
 		List<Integer> modelInputHalo;
-		List<Float> modelOutputScale;
-		List<Integer> modelOutputOffset;
+		List<Float> modelInputScale;
+		List<Float> modelOutputScaleDenoise;
+		List<Float> modelOutputScaleSegment;
+		List<Integer> modelOutputOffsetDenoise;
+		List<Integer> modelOutputOffsetSegment;
 		String modelNodeAxes;
 		int min = (int) Math.pow(2, config.getNetworkDepth());
 		int halo = 96;
@@ -124,15 +119,19 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 			modelInputMin = Arrays.asList(1, min, min, 1);
 			modelInputStep = Arrays.asList(1, min, min, 0);
 			modelInputHalo = Arrays.asList(0, halo, halo, 0);
-			modelOutputScale = Arrays.asList(1f, 1f, 1f, 1f);
-			modelOutputOffset = Arrays.asList(0, 0, 0, 3);
+			modelOutputScaleDenoise = Arrays.asList(1f, 1f, 1f, 1f);
+			modelOutputScaleSegment = Arrays.asList(1f, 1f, 1f, 1f);
+			modelOutputOffsetDenoise = Arrays.asList(0, 0, 0, 0);
+			modelOutputOffsetSegment = Arrays.asList(0, 0, 0, 2);
 		} else {
 			modelNodeAxes = "bzyxc";
 			modelInputMin = Arrays.asList(1, min, min, min, 1);
 			modelInputStep = Arrays.asList(1, min, min, min, 0);
 			modelInputHalo = Arrays.asList(0, halo, halo, halo, 0);
-			modelOutputScale = Arrays.asList(1f, 1f, 1f, 1f, 1f);
-			modelOutputOffset = Arrays.asList(0, 0, 0, 0, 3);
+			modelOutputScaleDenoise = Arrays.asList(1f, 1f, 1f, 1f, 1f);
+			modelOutputScaleSegment = Arrays.asList(1f, 1f, 1f, 1f, 1f);
+			modelOutputOffsetDenoise = Arrays.asList(0, 0, 0, 0, 0);
+			modelOutputOffsetSegment = Arrays.asList(0, 0, 0, 0, 2);
 		}
 		InputNodeSpecification inputNode = new DefaultInputNodeSpecification();
 		inputNode.setName(modelInputName);
@@ -142,46 +141,51 @@ public class DenoiSegModelSpecification extends DefaultModelSpecification {
 		inputNode.setHalo(modelInputHalo);
 		inputNode.setShapeMin(modelInputMin);
 		inputNode.setShapeStep(modelInputStep);
+		ZeroMeanUnitVarianceTransformation preprocessing = new ZeroMeanUnitVarianceTransformation();
+		preprocessing.setMode(ImageTransformation.Mode.FIXED);
+		preprocessing.setMean(outputHandler.getMean().get());
+		preprocessing.setStd(outputHandler.getStdDev().get());
+		inputNode.setPreprocessing(Collections.singletonList(preprocessing));
 		addInputNode(inputNode);
-		OutputNodeSpecification outputNode = new DefaultOutputNodeSpecification();
-		outputNode.setName(modelOutputName);
-		outputNode.setAxes(modelNodeAxes);
-		outputNode.setDataType(modelDataType);
-		outputNode.setDataRange(modelOutputDataRange);
-		outputNode.setShapeReferenceInput(modelInputName);
-		outputNode.setShapeScale(modelOutputScale);
-		outputNode.setShapeOffset(modelOutputOffset);
-		addOutputNode(outputNode);
+		OutputNodeSpecification denoiseOutput = new DefaultOutputNodeSpecification();
+		denoiseOutput.setName(modelOutputDenoiseName);
+		denoiseOutput.setAxes(modelNodeAxes);
+		denoiseOutput.setDataType(modelDataType);
+		denoiseOutput.setDataRange(modelOutputDenoiseDataRange);
+		denoiseOutput.setShapeReferenceInput(modelInputName);
+		denoiseOutput.setShapeScale(modelOutputScaleDenoise);
+		denoiseOutput.setShapeOffset(modelOutputOffsetDenoise);
+		ScaleLinearTransformation postprocessing = new ScaleLinearTransformation();
+		postprocessing.setMode(ImageTransformation.Mode.FIXED);
+		postprocessing.setOffset(outputHandler.getMean().get());
+		postprocessing.setGain(outputHandler.getStdDev().get());
+		denoiseOutput.setPostprocessing(Collections.singletonList(postprocessing));
+		addOutputNode(denoiseOutput);
+		OutputNodeSpecification segmentOutput = new DefaultOutputNodeSpecification();
+		segmentOutput.setName(modelOutputSegmentName);
+		segmentOutput.setAxes(modelNodeAxes);
+		segmentOutput.setDataType(modelDataType);
+		segmentOutput.setDataRange(modelOutputDenoiseDataRange);
+		segmentOutput.setShapeReferenceInput(modelInputName);
+		segmentOutput.setShapeScale(modelOutputScaleSegment);
+		segmentOutput.setShapeOffset(modelOutputOffsetSegment);
+		ClipTransformation clip = new ClipTransformation();
+		clip.setMode(ImageTransformation.Mode.FIXED);
+		clip.setMin(0);
+		clip.setMax(1);
+		segmentOutput.setPostprocessing(Collections.singletonList(clip));
+		addOutputNode(segmentOutput);
 	}
 
-	private void setMeta() {
+	private void setMeta(DenoiSegOutputHandler outputHandler) {
 		CitationSpecification citation = new DefaultCitationSpecification();
 		citation.setCitationText(citationText);
 		citation.setDOIText(doiText);
 		addCitation(citation);
 		setTags(tags);
 		setSource(modelSource);
-	}
-
-	public static boolean setFromSpecification(DenoiSegPrediction prediction, ModelSpecification specification) {
-		double mean = 0.0f;
-		double stdDev = 1.0f;
-
-		List<TransformationSpecification> predictionPreprocessing = specification.getPredictionPreprocessing();
-		if(predictionPreprocessing.size() > 0) {
-			Map<String, Object> kwargs = predictionPreprocessing.get(0).getKwargs();
-			if(kwargs != null) {
-				List<? extends Number> meanObj = (List<? extends Number>) kwargs.get(idMean);
-				if(meanObj != null && meanObj.size() > 0) mean = meanObj.get(0).doubleValue();
-				List<? extends Number> stdDevObj = (List<? extends Number>) kwargs.get(idStdDev);
-				if(stdDevObj != null && stdDevObj.size() > 0) stdDev = stdDevObj.get(0).doubleValue();
-			}
-		}
-
-		prediction.setMean(new FloatType((float) mean));
-		prediction.setStdDev(new FloatType((float) stdDev));
-
-		return true;
+		setSampleInputs(outputHandler.getSampleInputNames());
+		setSampleOutputs(outputHandler.getSampleOutputNames());
 	}
 
 }

@@ -28,8 +28,7 @@
  */
 package de.csbdresden.denoiseg.ui;
 
-import de.csbdresden.denoiseg.train.XYPairs;
-import jdk.nashorn.internal.scripts.JD;
+import de.csbdresden.denoiseg.train.TrainingDataCollection;
 import net.imagej.display.ColorTables;
 import net.imagej.display.SourceOptimizedCompositeXYProjector;
 import net.imagej.ops.OpService;
@@ -54,8 +53,6 @@ import org.scijava.plugin.Parameter;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
-import javax.swing.JDialog;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -72,7 +69,7 @@ public class InputConfirmationFrame<T extends RealType<T> & NativeType<T>> exten
 	private int numImagesDisplayed = 5;
 	private int previewDim = 200;
 
-	public InputConfirmationFrame(Context context, XYPairs<T> imagePairs) {
+	public InputConfirmationFrame(Context context, TrainingDataCollection<T> imagePairs) {
 		super(new MigLayout());
 		context.inject(this);
 		ImageIcon inputIcon = new ImageIcon();
@@ -81,9 +78,9 @@ public class InputConfirmationFrame<T extends RealType<T> & NativeType<T>> exten
 		add(createPreviewPanel(inputIcon, outputIcon, imagePairs), "newline, push, grow, span");
 	}
 
-	private Component createPreviewPanel(ImageIcon inputIcon, ImageIcon outputIcon, XYPairs<T> imagePairs) {
+	private Component createPreviewPanel(ImageIcon inputIcon, ImageIcon outputIcon, TrainingDataCollection<T> imagePairs) {
 		JPanel panel = new JPanel(new MigLayout());
-		XYPairs<T> list = new XYPairs<>();
+		TrainingDataCollection<T> list = new TrainingDataCollection<>();
 		list.addAll(imagePairs);
 		Collections.shuffle(list);
 		inputIcon.setImage(toBufferedImage(toImageRow(list, true)));
@@ -97,9 +94,9 @@ public class InputConfirmationFrame<T extends RealType<T> & NativeType<T>> exten
 		return panel;
 	}
 
-	private RandomAccessibleInterval<T> toImageRow(XYPairs<T> list, boolean useFirst) {
+	private RandomAccessibleInterval<T> toImageRow(TrainingDataCollection<T> list, boolean useFirst) {
 
-		RandomAccessibleInterval<T> firstImage = list.get(0).getA();
+		RandomAccessibleInterval<T> firstImage = list.get(0).input;
 		while(firstImage.numDimensions() > 2) {
 			firstImage = Views.hyperSlice(firstImage, 2, 0);
 		}
@@ -111,14 +108,14 @@ public class InputConfirmationFrame<T extends RealType<T> & NativeType<T>> exten
 		for (int i = 1; i < dims.length; i++) {
 			dims[i] = tileDims[i];
 		}
-		Img<T> res = new ArrayImgFactory<>(list.get(0).getA().randomAccess().get()).create(dims);
+		Img<T> res = new ArrayImgFactory<>(list.get(0).input.randomAccess().get()).create(dims);
 		long[] minSize = new long[dims.length*2];
 		for (int i = 0; i < dims.length; i++) {
 			minSize[i] = 0;
-			minSize[i+dims.length] = list.get(0).getA().dimension(i);
+			minSize[i+dims.length] = list.get(0).input.dimension(i);
 		}
 		for (int i = 0; i < numImagesDisplayed; i++) {
-			RandomAccessibleInterval<T> tile = useFirst ? list.get(i).getA() : list.get(i).getB();
+			RandomAccessibleInterval<T> tile = useFirst ? list.get(i).input : list.get(i).outSegment;
 			while(tile.numDimensions() > 2) {
 				tile = Views.hyperSlice(tile, 2, 0);
 			}
