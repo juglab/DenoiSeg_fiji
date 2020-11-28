@@ -29,6 +29,7 @@
 package de.csbdresden.denoiseg.command;
 
 import de.csbdresden.denoiseg.predict.DenoiSegOutput;
+import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
 import de.csbdresden.denoiseg.predict.DeprecatedDenoiSegPrediction;
 import net.imagej.Dataset;
 import net.imagej.DatasetService;
@@ -90,7 +91,7 @@ public class DenoiSegTrainPredictCommand extends DenoiSegTrainCommand {
 	}
 
 	private void predict() throws Exception {
-		DeprecatedDenoiSegPrediction prediction = new DeprecatedDenoiSegPrediction(context);
+		DenoiSegPrediction prediction = new DenoiSegPrediction(context);
 		prediction.setTrainedModel(latestTrainedModel);
 		DenoiSegOutput<?, ?> res = prediction.predict(this.predictionInput, axes);
 		this.denoised = datasetService.create(res.getDenoised());
