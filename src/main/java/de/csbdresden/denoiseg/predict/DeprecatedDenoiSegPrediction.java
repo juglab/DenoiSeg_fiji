@@ -97,23 +97,4 @@ public class DeprecatedDenoiSegPrediction extends DenoiSegPrediction {
 		// there is no sanity check implemented for segmentation models yet
 		return null;
 	}
-
-	public static void main(final String... args ) throws Exception {
-
-		final ImageJ ij = new ImageJ();
-		ij.launch( args );
-		String modelFile = "/home/random/Development/imagej/project/CSBDeep/training/DenoiSeg/mouse/latest.modelzoo.zip";
-		final File predictionInput = new File( "/home/random/Development/imagej/project/CSBDeep/data/DenoiSeg/data/DSB/train_data/10/X_train/img_3.tif" );
-
-		RandomAccessibleInterval _input = ( RandomAccessibleInterval ) ij.io().open( predictionInput.getAbsolutePath() );
-		RandomAccessibleInterval _inputConverted = ij.op().copy().rai(ij.op().convert().float32( Views.iterable( _input )));
-
-		DeprecatedDenoiSegPrediction prediction = new DeprecatedDenoiSegPrediction(ij.context());
-		prediction.setTrainedModel(modelFile);
-		prediction.setOptions(ModelZooPredictionOptions.options().numberOfTiles(1));
-		DenoiSegOutput output = prediction.predict(_inputConverted, "XY");
-		ij.ui().show( "denoised", output.getDenoised() );
-		ij.ui().show( "segmented", output.getSegmented() );
-
-	}
 }
