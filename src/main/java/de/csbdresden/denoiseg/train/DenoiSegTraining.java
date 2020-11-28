@@ -396,13 +396,15 @@ public class DenoiSegTraining implements ModelZooTraining {
 		resetBatchIndexIfNeeded();
 		ProcessedTrainingData<FloatType> item = training_data.getItem(index);
 		runTrainingOp(sess, item);
-		losses.add((double) output().getCurrentLoss());
-		logStatusInConsole(j + 1, config().getStepsPerEpoch());
-		if (!headless()) {
-			threadService.queue(() -> dialog.updateTrainingProgress(i + 1, j + 1));
+		if(!isCanceled() && !isStopped()) {
+			losses.add((double) output().getCurrentLoss());
+			logStatusInConsole(j + 1, config().getStepsPerEpoch());
+			if (!headless()) {
+				threadService.queue(() -> dialog.updateTrainingProgress(i + 1, j + 1));
+			}
+			stepsFinished = config().getStepsPerEpoch() * i + j + 1;
+			index++;
 		}
-		stepsFinished = config().getStepsPerEpoch() * i + j + 1;
-		index++;
 	}
 
 	private void resetBatchIndexIfNeeded() {
