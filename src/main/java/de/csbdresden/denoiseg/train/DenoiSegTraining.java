@@ -31,8 +31,8 @@ package de.csbdresden.denoiseg.train;
 import de.csbdresden.n2v.train.ModelZooTraining;
 import de.csbdresden.n2v.train.RemainingTimeEstimator;
 import de.csbdresden.n2v.ui.TrainingProgress;
-import io.scif.services.DatasetIOService;
-import net.imagej.ImageJ;
+import net.imagej.modelzoo.ModelZooArchive;
+import net.imagej.modelzoo.ModelZooService;
 import net.imagej.modelzoo.consumer.model.tensorflow.TensorFlowConverter;
 import net.imagej.ops.OpService;
 import net.imagej.tensorflow.TensorFlowService;
@@ -42,6 +42,7 @@ import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Pair;
 import net.imglib2.util.ValuePair;
+import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import org.scijava.Context;
 import org.scijava.app.StatusService;
@@ -67,7 +68,6 @@ import java.util.concurrent.Future;
 
 public class DenoiSegTraining implements ModelZooTraining {
 
-	private File graphDefFile;
 
 	@Parameter
 	private TensorFlowService tensorFlowService;
@@ -82,73 +82,77 @@ public class DenoiSegTraining implements ModelZooTraining {
 	private LogService logService;
 
 	@Parameter
-	private DatasetIOService datasetIOService;
-
-	@Parameter
 	private StatusService statusService;
 
 	@Parameter
 	private ThreadService threadService;
 
 	@Parameter
+	private ModelZooService modelZooService;
+
+	@Parameter
 	private Context context;
 
 	// training feed
 	private static final String trainingFeedXOp = "input";
-	private static final String trainingFeedYOp = "activation_19_target";
-	private static final String trainingFeedSampleWeightsOp = "activation_19_sample_weights";
+	private static final String trainingFeedYDenoiseOp = "out_denoise_target";
+	private static final String trainingFeedYSegmentOp = "out_segment_target";
+	private static final String trainingFeedSampleWeightsDenoiseOp = "out_denoise_sample_weights";
+	private static final String trainingFeedSampleWeightsSegmentOp = "out_segment_sample_weights";
 	private static final String trainingFeedLearningPhaseOp = "keras_learning_phase";
 	// training fetch
-	private static final String trainingFetchLossOp = "loss/mul";
-	private static final String trainingFetchDenoisegLossOp = "metrics/denoiseg/Mean_1";
-	private static final String trainingFetchSegLossOp = "metrics/seg_loss/Mean_1";
-	private static final String trainingFetchDenoiseLossOp = "metrics/denoise_loss/Mean";
-	private static final String trainingFetchLearningOp = "Adam/lr/read";
-	private static final String lrAssignOpName = "Adam/lr";
+	private static final String trainingFetchLossOp = "loss_denoiseg";
+	private static final String trainingFetchSegLossOp = "loss_segment";
+	private static final String trainingFetchDenoiseLossOp = "loss_denoise";
+	private static final String trainingFetchLearningOp = "read_learning_rate";
+	private static final String lrAssignOpName = "write_learning_rate";
 	// training target
-	private static final String trainingTargetOp = "training/group_deps";
-
+	private static final String trainingTargetOp = "train";
 	// prediction feed
 	static final String predictionFeedInputOp = trainingFeedXOp;
 	// prediction target
-	static final String predictionTargetOp = "activation_19/Identity";
-
+	static final String predictionTargetDenoiseOp = "output_denoised";
+	static final String predictionTargetSegmentOp = "output_segmented";
 	// validation target
-	private static final String validationTargetOp = "group_deps";
+	private static final String validationTargetOp = "validation";
 
 	private TrainingProgress dialog;
-	private PreviewHandler previewHandler;
-	private OutputHandler outputHandler;
-	private InputHandler inputHandler;
 
+	private PreviewHandler previewHandler;
+	private DenoiSegOutputHandler outputHandler;
+	private InputHandler inputHandler;
 	private boolean stopTraining = false;
 
 	private List<TrainingCallback> onEpochDoneCallbacks = new ArrayList<>();
 	private List<TrainingCanceledCallback> onTrainingCanceled = new ArrayList<>();
 
-	//TODO make setters etc.
 	private boolean continueTraining = false;
 	private File zipFile;
 	private boolean canceled = false;
 	private Session session;
 	private DenoiSegConfig config;
 	private int stepsFinished = 0;
-
 	private int previewCount = 1;
+
 	private int index;
-	private Tensor<Float> tensorWeights;
-	private XYPairs<FloatType> validationData;
-	private List<Pair<Tensor, Tensor>> validationTensorData;
+	private Tensor<Float> tensorWeightsSegment;
+	private Tensor<Float> tensorWeightsDenoise;
+	private ProcessedTrainingDataCollection<FloatType> validationData;
+	private List<Pair<Tensor, Pair<Tensor, Tensor>>> validationTensorData;
 	private Future<?> future;
+	private int count = 0;
 
 	public interface TrainingCallback {
 
 		void accept(DenoiSegTraining training);
-	}
-	public interface TrainingCanceledCallback {
 
-		void accept();
 	}
+
+	public interface TrainingCanceledCallback {
+		void accept();
+
+	}
+
 	public DenoiSegTraining(Context context) {
 		context.inject(this);
 	}
@@ -164,17 +168,17 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 		this.config = config;
 
-		inputHandler= new InputHandler(context, config);
+		inputHandler = new InputHandler(context, config);
 
 		if (Thread.interrupted()) return;
 
-		if(!headless()) initDialog(config);
+		if (!headless()) initDialog(config);
 
 		if (Thread.interrupted()) return;
 
-		logService.info( "Load TensorFlow.." );
+		logService.info("Load TensorFlow..");
 		tensorFlowService.loadLibrary();
-		logService.info( tensorFlowService.getStatus().getInfo() );
+		logService.info(tensorFlowService.getStatus().getInfo());
 
 		addCallbackOnEpochDone(new ReduceLearningRateOnPlateau()::reduceLearningRateOnPlateau);
 		addCallbackOnCancel(input()::cancel);
@@ -182,15 +186,15 @@ public class DenoiSegTraining implements ModelZooTraining {
 	}
 
 	private void initDialog(DenoiSegConfig config) {
-		dialog = TrainingProgress.create( this, config.getNumEpochs(), config.getStepsPerEpoch(), statusService, new DefaultThreadService() );
+		dialog = TrainingProgress.create(this, config.getNumEpochs(), config.getStepsPerEpoch(), statusService, new DefaultThreadService());
 		dialog.setTitle("DenoiSeg");
-		dialog.setWaitingIcon(getClass().getClassLoader().getResource( "bird.gif" ), 1, 1, 0, -10);
+		dialog.setWaitingIcon(getClass().getClassLoader().getResource("bird.gif"), 1, 1, 0, -10);
 		inputHandler.setDialog(dialog);
-		dialog.addTask( "Preparation" );
-		dialog.addTask( "Training" );
+		dialog.addTask("Preparation");
+		dialog.addTask("Training");
 		dialog.display();
-		dialog.setTaskStart( 0 );
-		dialog.setCurrentTaskMessage( "Loading TensorFlow" );
+		dialog.setTaskStart(0);
+		dialog.setCurrentTaskMessage("Loading TensorFlow");
 
 		//TODO warning if no GPU support
 		//dialog.setWarning("WARNING: this will take for ever!");
@@ -204,31 +208,33 @@ public class DenoiSegTraining implements ModelZooTraining {
 		try {
 			future = threadService.run(this::mainThread);
 			future.get();
-		} catch(CancellationException e) {
-			if(stopTraining) return;
+		} catch (CancellationException e) {
+			if (stopTraining) return;
 			cancel();
 			logService.warn("DenoiSeg training canceled.");
 		} catch (InterruptedException | ExecutionException e) {
+			if (!headless()) uiService.showDialog("Training failed. See console for more details.");
 			e.printStackTrace();
+			cancel();
 		}
 	}
 
 	private void mainThread() {
-		outputHandler = new OutputHandler(config, this, context);
-		addCallbackOnEpochDone(outputHandler::copyBestModel);
+		outputHandler = new DenoiSegOutputHandler(config, this, context);
+		addCallbackOnEpochDone(training -> outputHandler.copyBestModel());
 
 		logTrainingStep("Create session..");
 		if (Thread.interrupted() || isCanceled()) return;
 
 		try (Graph graph = new Graph();
-		     Session sess = new Session( graph )) {
+		     Session sess = new Session(graph)) {
 
 			this.session = sess;
 
 			loadGraph(graph);
 			output().initTensors(sess);
 			input().finalizeTrainingData();
-			if(input().getTrainingData().size() == 0) {
+			if (input().getTrainingData().size() == 0) {
 				logService.error("Not training data available");
 				return;
 			}
@@ -252,11 +258,12 @@ public class DenoiSegTraining implements ModelZooTraining {
 			makeValidationData(n2v_perc_pix);
 
 			index = 0;
-			tensorWeights = makeWeightsTensor();
+			tensorWeightsSegment = makeWeightsTensor();
+			tensorWeightsDenoise = makeWeightsTensor();
 
 			if (handleInterruptionOrCancelation()) return;
 			logTrainingStep("Start training..");
-			if(!headless()) {
+			if (!headless()) {
 				threadService.queue(() -> {
 					dialog.setTaskDone(0);
 					dialog.setTaskStart(1);
@@ -266,7 +273,7 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 			RemainingTimeEstimator timeEstimator = initTimeEstimator();
 
-			for (int epoch = 0; epoch < config().getNumEpochs() &&!stopTraining; epoch++) {
+			for (int epoch = 0; epoch < config().getNumEpochs() && !stopTraining; epoch++) {
 				updateTimeEstimator(timeEstimator, epoch);
 				runEpoch(training_data, epoch);
 				if (handleInterruptionOrCancelation()) return;
@@ -274,44 +281,40 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 //			sess.runner().feed("save/Const", checkpointPrefix).addTarget("save/control_dependency").run();
 
-			if ( !headless() ) {
-				threadService.queue(() -> dialog.setTaskDone( 1 ));
+			if (!headless()) {
+				threadService.queue(() -> dialog.setTaskDone(1));
 			}
 			stopTraining = true;
-			logService.info( "Training done." );
+			logService.info("Training done.");
 
 //			if (inputs.size() > 0) uiService.show("inputs", Views.stack(inputs));
 //			if (targets.size() > 0) uiService.show("targets", Views.stack(targets));
 
-		}
-		catch(IllegalStateException e) {
+		} catch (IllegalStateException e) {
 			cancel();
 			e.printStackTrace();
-			if(e.getMessage().contains("OOM")) {
+			if (e.getMessage().contains("OOM")) {
 				logService.error("Not enough memory available. Try to reduce the training batch size.");
 			} else {
 				e.printStackTrace();
 			}
 		} finally {
-			if(tensorWeights != null) tensorWeights.close();
-			if(validationTensorData != null) {
-				for (Pair<Tensor, Tensor> pair : validationTensorData) {
+			if (tensorWeightsSegment != null) tensorWeightsSegment.close();
+			if (tensorWeightsDenoise != null) tensorWeightsDenoise.close();
+			if (validationTensorData != null) {
+				for (Pair<Tensor, Pair<Tensor, Tensor>> pair : validationTensorData) {
 					pair.getA().close();
-					pair.getB().close();
+					pair.getB().getA().close();
+					pair.getB().getB().close();
 				}
 			}
 		}
 	}
 
-//	public boolean confirmInputMatching(String title, File input1, File input2) {
-//		InputConfirmationHandler inputConfirmationHandler = new InputConfirmationHandler(context, input1, input2);
-//		return inputConfirmationHandler.confirmTrainingData();
-//	}
-
 	private boolean confirmInputData() {
 		InputConfirmationHandler inputConfirmationHandler = new InputConfirmationHandler(context, input());
 		boolean confirmed = inputConfirmationHandler.confirmTrainingData();
-		if(!confirmed) return false;
+		if (!confirmed) return false;
 		return inputConfirmationHandler.confirmValidationData();
 	}
 
@@ -326,13 +329,16 @@ public class DenoiSegTraining implements ModelZooTraining {
 			if (handleInterruptionOrCancelation()) return;
 			runEpochStep(session, epoch, step, training_data, losses);
 		}
+		if (!headless()) {
+			dialog.enableModelSaving();
+		}
 		if (handleInterruptionOrCancelation()) return;
 		training_data.on_epoch_end();
 		float validationLoss = validate();
 		if (handleInterruptionOrCancelation()) return;
-		output().saveCheckpoint(session, previewHandler.getExampleInput(), previewHandler.getExampleOutput());
-		output().setCurrentValidationSegLoss(validationLoss);
-		if(!headless()) {
+		output().saveCheckpoint(session, previewHandler.getExampleInput(), previewHandler.getExampleOutputDenoise());
+		output().setCurrentValidationLoss(validationLoss);
+		if (!headless()) {
 			threadService.queue(() -> dialog.updateTrainingChart(epoch + 1, losses, validationLoss));
 		}
 		onEpochDoneCallbacks.forEach(callback -> callback.accept(this));
@@ -347,7 +353,8 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 	private boolean handleInterruptionOrCancelation() {
 		if (Thread.interrupted() || isCanceled()) {
-			tensorWeights.close();
+			tensorWeightsDenoise.close();
+			tensorWeightsSegment.close();
 			return true;
 		}
 		return false;
@@ -355,11 +362,6 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 	private void initPreviewHandler() {
 		previewHandler = new PreviewHandler(context, config().getTrainDimensions());
-//		RandomAccessibleInterval<FloatType> second = validation_data.get(0).getSecond();
-//		previewHandler.updateTrainingPreview(validation_data.get(0).getFirst(),
-//				Views.interval(second, new FinalInterval(second.dimension(0), second.dimension(1), second.dimension(2), second.dimension(3)-1)));
-//		previewHandler.updateValidationPreview(validation_data.get(0).getFirst(),
-//				Views.interval(second, new FinalInterval(second.dimension(0), second.dimension(1), second.dimension(2), second.dimension(3)-1)));
 	}
 
 	private RemainingTimeEstimator initTimeEstimator() {
@@ -376,13 +378,12 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 	private void loadGraph(Graph graph) {
 		try {
-			if(!continueTraining) {
-				logService.info( "Import graph.." );
+			if (!continueTraining) {
+				logService.info("Import graph..");
 				output().loadUntrainedGraph(graph);
 				output().createSavedModelDirs();
-			}
-			else {
-				logService.info( "Import trained graph.." );
+			} else {
+				logService.info("Import trained graph..");
 				File trainedModel = output().loadTrainedGraph(graph, zipFile);
 				output().createSavedModelDirsFromExisting(trainedModel);
 			}
@@ -393,14 +394,14 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 	private void runEpochStep(Session sess, int i, int j, DenoiSegDataWrapper<FloatType> training_data, List<Double> losses) {
 		resetBatchIndexIfNeeded();
-		Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> item = training_data.getItem(index);
+		ProcessedTrainingData<FloatType> item = training_data.getItem(index);
 		runTrainingOp(sess, item);
 		losses.add((double) output().getCurrentLoss());
 		logStatusInConsole(j + 1, config().getStepsPerEpoch());
-		if(!headless()) {
+		if (!headless()) {
 			threadService.queue(() -> dialog.updateTrainingProgress(i + 1, j + 1));
 		}
-		stepsFinished = config().getStepsPerEpoch()*i+j+1;
+		stepsFinished = config().getStepsPerEpoch() * i + j + 1;
 		index++;
 	}
 
@@ -438,16 +439,19 @@ public class DenoiSegTraining implements ModelZooTraining {
 				n2v_perc_pix, patch_shape, config().getNeighborhoodRadius(),
 				DenoiSegDataWrapper::uniform_withCP);
 
-		XYPairs<FloatType> validationDataList = new XYPairs<>();
+		ProcessedTrainingDataCollection<FloatType> validationDataList = new ProcessedTrainingDataCollection<>();
 		for (int i = 0; i < valData.numBatches(); i++) {
 			validationDataList.add(valData.getItem(i));
 		}
 		this.validationData = validationDataList;
 		validationTensorData = new ArrayList<>();
-		for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> pair : validationDataList) {
-			Tensor tensorX = TensorFlowConverter.imageToTensor(pair.getA(), getMapping());
-			Tensor tensorY = TensorFlowConverter.imageToTensor(pair.getB(), getMapping());
-			validationTensorData.add(new ValuePair<>(tensorX, tensorY));
+		for (ProcessedTrainingData<FloatType> data : validationDataList) {
+			Tensor tensorX = TensorFlowConverter.imageToTensor(data.input, getMapping());
+			RandomAccessibleInterval<FloatType> denoised = data.outDenoise;
+			RandomAccessibleInterval<FloatType> segmented = data.outSegment;
+			Tensor tensorYDenoise = TensorFlowConverter.imageToTensor(denoised, getMapping());
+			Tensor tensorYSegment = TensorFlowConverter.imageToTensor(segmented, getMapping());
+			validationTensorData.add(new ValuePair<>(tensorX, new ValuePair<>(tensorYDenoise, tensorYSegment)));
 		}
 	}
 
@@ -455,56 +459,75 @@ public class DenoiSegTraining implements ModelZooTraining {
 		FloatType mean = output().getMean();
 		FloatType stdDev = output().getStdDev();
 		List<RandomAccessibleInterval<FloatType>> x = new ArrayList<>();
-		for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> pair : input().getTrainingData()) {
-			x.add(pair.getA());
+		for (TrainingData<FloatType> pair : input().getTrainingData()) {
+			x.add(pair.input);
 		}
-		mean.set( opService.stats().mean( Views.iterable( Views.stack(x) ) ).getRealFloat() );
-		stdDev.set( opService.stats().stdDev( Views.iterable( Views.stack(x) ) ).getRealFloat() );
+		mean.set(opService.stats().mean(Views.iterable(Views.stack(x))).getRealFloat());
+		stdDev.set(opService.stats().stdDev(Views.iterable(Views.stack(x))).getRealFloat());
 		logService.info("mean: " + mean.get());
 		logService.info("stdDev: " + stdDev.get());
 
-		TrainUtils.normalize( input().getTrainingData(), mean, stdDev );
-		TrainUtils.normalize( input().getValidationData(), mean, stdDev );
+		TrainUtils.normalize(input().getTrainingData(), mean, stdDev);
+		TrainUtils.normalize(input().getValidationData(), mean, stdDev);
 	}
 
-	private void runTrainingOp(Session sess, Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> item) {
+	private void runTrainingOp(Session sess, ProcessedTrainingData<FloatType> item) {
 //		if(previewCount-- > 0) {
-//			opService.context().service(UIService.class).show("X", item.getA());
-//			opService.context().service(UIService.class).show("Y", item.getB());
+//			opService.context().service(UIService.class).show("input", item.input);
+//			opService.context().service(UIService.class).show("denoise", item.outDenoise);
+//			opService.context().service(UIService.class).show("segmented", item.outSegment);
 //		}
-//		System.out.println("X: " + Arrays.toString(Intervals.dimensionsAsIntArray(item.getFirst())));
-//		System.out.println("Y: " + Arrays.toString(Intervals.dimensionsAsIntArray(item.getSecond())));
-		Tensor tensorX = TensorFlowConverter.imageToTensor(item.getA(), getMapping());
-		Tensor tensorY = TensorFlowConverter.imageToTensor(item.getB(), getMapping());
+		Tensor tensorX = TensorFlowConverter.imageToTensor(item.input, getMapping());
+		Tensor tensorYDenoise = TensorFlowConverter.imageToTensor(item.outDenoise, getMapping());
+		Tensor tensorYSegment = TensorFlowConverter.imageToTensor(item.outSegment, getMapping());
 
 		Session.Runner runner = sess.runner();
 
 		Tensor<Float> learningRate = Tensors.create(output().getCurrentLearningRate());
 		Tensor<Boolean> learningPhase = Tensors.create(true);
 		runner.feed(trainingFeedXOp, tensorX)
-				.feed(trainingFeedYOp, tensorY)
+				.feed(trainingFeedYDenoiseOp, tensorYDenoise)
+				.feed(trainingFeedYSegmentOp, tensorYSegment)
 				.feed(trainingFeedLearningPhaseOp, learningPhase)
 				.feed(lrAssignOpName, learningRate)
-				.feed(trainingFeedSampleWeightsOp, tensorWeights)
+				.feed(trainingFeedSampleWeightsDenoiseOp, tensorWeightsDenoise)
+				.feed(trainingFeedSampleWeightsSegmentOp, tensorWeightsSegment)
 				.addTarget(trainingTargetOp);
 		runner.fetch(trainingFetchLossOp);
-		runner.fetch(trainingFetchDenoisegLossOp);
 		runner.fetch(trainingFetchDenoiseLossOp);
 		runner.fetch(trainingFetchSegLossOp);
 		runner.fetch(trainingFetchLearningOp);
 
 		List<Tensor<?>> fetchedTensors = runner.run();
-		output().setCurrentLoss(fetchedTensors.get(0).floatValue());
-		output().setCurrentDenoisegLoss(fetchedTensors.get(1).floatValue());
-		output().setCurrentDenoiseLoss(fetchedTensors.get(2).floatValue());
-		output().setCurrentSegLoss(fetchedTensors.get(3).floatValue());
-		output().setCurrentLearningRate(fetchedTensors.get(4).floatValue());
+		float loss = fetchedTensors.get(0).floatValue();
+		float denoiseLoss = fetchedTensors.get(1).floatValue();
+		float segLoss = fetchedTensors.get(2).floatValue();
+		float newLearningRate = fetchedTensors.get(3).floatValue();
+
+		output().setCurrentLoss(loss);
+		output().setCurrentDenoiseLoss(denoiseLoss);
+		output().setCurrentSegLoss(segLoss);
+		output().setCurrentLearningRate(newLearningRate);
 
 		fetchedTensors.forEach(Tensor::close);
 		tensorX.close();
-		tensorY.close();
+		tensorYDenoise.close();
+		tensorYSegment.close();
 		learningPhase.close();
 		learningRate.close();
+	}
+
+	private RandomAccessibleInterval<FloatType> getChannels(RandomAccessibleInterval<FloatType> img, int channelMin, int channelMax) {
+		long[] min = new long[img.numDimensions()];
+		long[] max = new long[img.numDimensions()];
+		img.max(max);
+		min[min.length - 1] = channelMin;
+		max[max.length - 1] = channelMax;
+		IntervalView<FloatType> interval = Views.interval(img, min, max);
+//		if(++count < 10) {
+//			uiService.show(String.valueOf(count), interval);
+//		}
+		return interval;
 	}
 
 	public void addCallbackOnEpochDone(TrainingCallback callback) {
@@ -512,13 +535,13 @@ public class DenoiSegTraining implements ModelZooTraining {
 	}
 
 	private int[] getMapping() {
-		if(config().getTrainDimensions() == 2) return new int[]{ 1, 2, 0, 3 };
-		if(config().getTrainDimensions() == 3) return new int[]{ 1, 2, 3, 0, 4 };
+		if (config().getTrainDimensions() == 2) return new int[]{1, 2, 0, 3};
+		if (config().getTrainDimensions() == 3) return new int[]{1, 2, 3, 0, 4};
 		return new int[0];
 	}
 
 	private boolean batchNumSufficient(int n_train) {
-		if(config().getTrainBatchSize() > n_train) {
+		if (config().getTrainBatchSize() > n_train) {
 			String errorMsg = "Not enough training data (" + n_train + " batches). At least " + config().getTrainBatchSize() + " batches needed.";
 			logService.error(errorMsg);
 			stopTraining = true;
@@ -539,56 +562,69 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 		float avgDenoiseLoss = 0;
 		float avgSegLoss = 0;
+		float avgLoss = 0;
 
 		long validationBatches = validationTensorData.size();
 		int i = 0;
 		for (; i < validationBatches; i++) {
 
-			Pair<Tensor, Tensor> tensorItem = validationTensorData.get(i);
-			Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> item = validationData.get(i);
+			Pair<Tensor, Pair<Tensor, Tensor>> tensorItem = validationTensorData.get(i);
+			ProcessedTrainingData<FloatType> item = validationData.get(i);
 
 			Tensor tensorX = tensorItem.getA();
-			Tensor tensorY = tensorItem.getB();
+			Tensor tensorYDenoise = tensorItem.getB().getA();
+			Tensor tensorYSegment = tensorItem.getB().getB();
 			Tensor<Boolean> tensorLearningPhase = Tensors.create(false);
 
 			Session.Runner runner = session.runner();
 
 			runner.feed(trainingFeedXOp, tensorX)
-					.feed(trainingFeedYOp, tensorY)
+					.feed(trainingFeedYDenoiseOp, tensorYDenoise)
+					.feed(trainingFeedYSegmentOp, tensorYSegment)
 					.feed(trainingFeedLearningPhaseOp, tensorLearningPhase)
-					.feed(trainingFeedSampleWeightsOp, tensorWeights)
+					.feed(trainingFeedSampleWeightsSegmentOp, tensorWeightsSegment)
+					.feed(trainingFeedSampleWeightsDenoiseOp, tensorWeightsDenoise)
 					.addTarget(validationTargetOp);
+			runner.fetch(trainingFetchLossOp);
 			runner.fetch(trainingFetchDenoiseLossOp);
 			runner.fetch(trainingFetchSegLossOp);
-			if(!headless() && i == 0) runner.fetch(predictionTargetOp);
+			if (i == 0) {
+				runner.fetch(predictionTargetDenoiseOp);
+				runner.fetch(predictionTargetSegmentOp);
+			}
 
 			List<Tensor<?>> fetchedTensors = runner.run();
 
-			avgDenoiseLoss += fetchedTensors.get(0).floatValue();
-			avgSegLoss += fetchedTensors.get(1).floatValue();
+			avgLoss += fetchedTensors.get(0).floatValue();
+			avgDenoiseLoss += fetchedTensors.get(1).floatValue();
+			avgSegLoss += fetchedTensors.get(2).floatValue();
 
-			if(!headless() && i == 0) {
-				Tensor outputTensor = fetchedTensors.get(2);
-				RandomAccessibleInterval<FloatType> output = TensorFlowConverter.tensorToImage(outputTensor, getMapping());
-				previewHandler.updateValidationPreview(denormalize(item.getA()), denormalize(output), headless());
+			if (i == 0) {
+				Tensor outputTensorDenoise = fetchedTensors.get(3);
+				Tensor outputTensorSegment = fetchedTensors.get(4);
+				RandomAccessibleInterval<FloatType> outputDenoise = TensorFlowConverter.tensorToImage(outputTensorDenoise, getMapping());
+				RandomAccessibleInterval<FloatType> outputSegment = TensorFlowConverter.tensorToImage(outputTensorSegment, getMapping());
+				previewHandler.updateValidationPreview(item.input, outputDenoise, outputSegment, headless(), outputHandler, isStopped() || isCanceled());
 //			updateHistoryImage(output);
 			}
 			fetchedTensors.forEach(Tensor::close);
 			tensorLearningPhase.close();
 
 			if (stopTraining || Thread.interrupted() || isCanceled()) {
+				i++;
 				break;
 			}
 		}
-		avgDenoiseLoss /= (float)(i+1);
-		avgSegLoss /= (float)(i+1);
+		avgDenoiseLoss /= (float) (i);
+		avgSegLoss /= (float) (i);
+		avgLoss /= (float) (i);
 
-		logService.info("\nValidation denoise loss: " + avgDenoiseLoss + " seg loss: " + avgSegLoss);
-		return avgDenoiseLoss;
+		logService.info("\nValidation loss: " + avgLoss + " denoise loss: " + avgDenoiseLoss + " seg loss: " + avgSegLoss);
+		return avgLoss;
 	}
 
-	private RandomAccessibleInterval<FloatType> denormalize(RandomAccessibleInterval<FloatType> img) {
-		return de.csbdresden.n2v.train.TrainUtils.denormalizeConverter(img, output().getMean(), output().getStdDev());
+	public boolean isStopped() {
+		return stopTraining;
 	}
 
 	public int getStepsFinished() {
@@ -601,22 +637,22 @@ public class DenoiSegTraining implements ModelZooTraining {
 
 	private void logStatusInConsole(int step, int stepTotal) {
 		int maxBareSize = 10; // 10unit for 100%
-		int remainProcent = ( ( 100 * step ) / stepTotal ) / maxBareSize;
+		int remainProcent = ((100 * step) / stepTotal) / maxBareSize;
 		char defaultChar = '-';
 		String icon = "*";
-		String bare = new String( new char[ maxBareSize ] ).replace( '\0', defaultChar ) + "]";
+		String bare = new String(new char[maxBareSize]).replace('\0', defaultChar) + "]";
 		StringBuilder bareDone = new StringBuilder();
-		bareDone.append( "[" );
-		for ( int i = 0; i < remainProcent; i++ ) {
-			bareDone.append( icon );
+		bareDone.append("[");
+		for (int i = 0; i < remainProcent; i++) {
+			bareDone.append(icon);
 		}
-		String bareRemain = bare.substring( remainProcent );
-		System.out.printf( "%d / %d %s%s - loss: %f denoiseg loss: %f seg loss: %f denoise loss: %f lr: %f\n", step, stepTotal, bareDone, bareRemain,
+		String bareRemain = bare.substring(remainProcent);
+		System.out.printf("%d / %d %s%s - loss: %f seg loss: %f denoise loss: %f lr: %f\n", step, stepTotal, bareDone, bareRemain,
 				output().getCurrentLoss(),
-				output().getCurrentDenoiSegLoss(),
+//				output().getCurrentDenoiSegLoss(),
 				output().getCurrentSegLoss(),
 				output().getCurrentDenoiseLoss(),
-				output().getCurrentLearningRate() );
+				output().getCurrentLearningRate());
 	}
 
 	public TrainingProgress getDialog() {
@@ -631,8 +667,19 @@ public class DenoiSegTraining implements ModelZooTraining {
 		return inputHandler;
 	}
 
-	public OutputHandler output() {
+	public DenoiSegOutputHandler output() {
 		return outputHandler;
+	}
+
+	public void saveModel() {
+		try {
+			File latestModel = this.output().exportLatestTrainedModel();
+			ModelZooArchive latestTrainedModel = modelZooService.io().open(latestModel);
+			uiService.show("Export current latest Model", latestTrainedModel);
+		} catch (IOException e) {
+			logService.error(e);
+		}
+		logService.info("Saved latest trained model to path: " + outputHandler.getMostRecentModelDir().getAbsolutePath());
 	}
 
 	@Override
@@ -661,29 +708,4 @@ public class DenoiSegTraining implements ModelZooTraining {
 		if(output() != null) output().dispose();
 	}
 
-	public static void main( final String... args ) throws Exception {
-
-		final ImageJ ij = new ImageJ();
-		ij.launch( args );
-
-		File trainX = new File("/home/random/Development/imagej/project/CSBDeep/data/DenoiSeg/data/DSB/train_data/10/X_train");
-		File trainY = new File("/home/random/Development/imagej/project/CSBDeep/data/DenoiSeg/data/DSB/train_data/10/Y_train");
-		File valX = new File("/home/random/Development/imagej/project/CSBDeep/data/DenoiSeg/data/DSB/train_data/10/X_val");
-		File valY = new File("/home/random/Development/imagej/project/CSBDeep/data/DenoiSeg/data/DSB/train_data/10/Y_val");
-
-		DenoiSegTraining training = new DenoiSegTraining(ij.context());
-		training.init(new DenoiSegConfig()
-				.setNumEpochs(200)
-				.setStepsPerEpoch(2)
-				.setBatchSize(32)
-				.setPatchShape(64));
-		training.input().addTrainingData(trainX, trainY);
-		training.input().addValidationData(valX, valY);
-		training.train();
-		if(!training.isCanceled()) {
-			File modelFile = training.output().exportLatestTrainedModel();
-			Object model = ij.io().open(modelFile.getAbsolutePath());
-			ij.ui().show(model);
-		}
-	}
 }

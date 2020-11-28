@@ -37,8 +37,7 @@ import net.imglib2.converter.Converter;
 import net.imglib2.converter.Converters;
 import net.imglib2.converter.RealFloatConverter;
 import net.imglib2.img.Img;
-import net.imglib2.img.array.ArrayImgFactory;
-import net.imglib2.loops.LoopBuilder;
+import net.imglib2.img.cell.CellImgFactory;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
@@ -84,9 +83,9 @@ public class InputHandler {
 	private int showXPreviews = 10;
 
 	private final List< RandomAccessibleInterval< FloatType > > trainingUnlabeled = new ArrayList<>();
-	private final XYPairs<FloatType> trainingLabeled = new XYPairs<>();
-	private final XYPairs<FloatType> validationData = new XYPairs<>();
-	private final XYPairs<FloatType> trainingData = new XYPairs<>();
+	private final TrainingDataCollection<FloatType> trainingLabeled = new TrainingDataCollection<>();
+	private final TrainingDataCollection<FloatType> validationData = new TrainingDataCollection<>();
+	private final TrainingDataCollection<FloatType> trainingData = new TrainingDataCollection<>();
 	private Collection subscribers;
 	private boolean canceled = false;
 
@@ -217,18 +216,18 @@ public class InputHandler {
 
 		if(labeling != null) {
 			RandomAccessibleInterval<FloatType> oneHot = convertToOneHot(labeling);
-			XYPairs<FloatType> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
+			TrainingDataCollection<FloatType> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
 //			display(tiles);
 			int numValidation = (int) (tiles.size() * 0.05);
 			int i = 0;
-			for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> tile : tiles) {
-				RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(tile.getA());
-				RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(tile.getB());
+			for (TrainingData<FloatType> tile : tiles) {
+				RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(tile.input);
+				RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(tile.outSegment);
 //				logService.info("Tile dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(channel0)));
 				if(i++ < numValidation) {
-					validationData.add(new ValuePair<>(channel0, channel1));
+					validationData.add(new TrainingData<>(channel0, channel1));
 				} else {
-					trainingLabeled.add(new ValuePair<>(channel0, channel1));
+					trainingLabeled.add(new TrainingData<>(channel0, channel1));
 				}
 			}
 		} else {
@@ -243,17 +242,17 @@ public class InputHandler {
 
 		if (Thread.interrupted()) return;
 
-		logService.info("Training image raw dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(raw)));
+//		logService.info("Training image raw dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(raw)));
 //		logService.info("Training image labeling dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(labeling)));
 
 		if(labeling != null) {
 			RandomAccessibleInterval<FloatType> oneHot = convertToOneHot(labeling);
-			XYPairs<FloatType> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
-			for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> tile : tiles) {
-				RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(tile.getA());
-				RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(tile.getB());
+			TrainingDataCollection<FloatType> tiles = DenoiSegDataGenerator.createTiles(raw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
+			for (TrainingData<FloatType> tile : tiles) {
+				RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(tile.input);
+				RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(tile.outSegment);
 //				logService.info("Tile dimensions: " + Arrays.toString(Intervals.dimensionsAsIntArray(channel0)));
-				trainingLabeled.add(new ValuePair<>(channel0, channel1));
+				trainingLabeled.add(new TrainingData<>(channel0, channel1));
 			}
 		} else {
 			List<RandomAccessibleInterval<FloatType>> tiles = DenoiSegDataGenerator.createTiles(raw, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
@@ -295,13 +294,13 @@ public class InputHandler {
 
 		RandomAccessibleInterval<FloatType> oneHot = convertToOneHot(validationLabeling);
 
-		List<Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>>> tiles =
+		TrainingDataCollection<FloatType> tiles =
 				DenoiSegDataGenerator.createTiles(validationRaw, oneHot, config.getTrainDimensions(), config.getTrainPatchShape(), logService);
 //		uiService.show(tiles);
-		for (Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<FloatType>> pair : tiles) {
-			RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(pair.getA());
-			RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(pair.getB());
-			validationData.add(new ValuePair<>(channel0, channel1));
+		for (TrainingData<FloatType> pair : tiles) {
+			RandomAccessibleInterval<FloatType> channel0 = addTwoDimensions(pair.input);
+			RandomAccessibleInterval<FloatType> channel1 = addBatchDimension(pair.outSegment);
+			validationData.add(new TrainingData<>(channel0, channel1));
 		}
 	}
 
@@ -314,25 +313,25 @@ public class InputHandler {
 		Collections.shuffle(validationData);
 		trainingData.clear();
 		trainingData.addAll(trainingLabeled);
-		ArrayImgFactory<FloatType> factory = new ArrayImgFactory<>(new FloatType());
+		CellImgFactory<FloatType> factory = new CellImgFactory<>(new FloatType());
 		for (RandomAccessibleInterval<FloatType> raw : trainingUnlabeled) {
 			long[] dims = new long[raw.numDimensions()];
 			raw.dimensions(dims);
 			dims[dims.length-1] = 3;
-			trainingData.add(new ValuePair<>(raw, factory.create(dims)));
+			trainingData.add(new TrainingData<>(raw, factory.create(dims)));
 		}
 		Collections.shuffle(trainingData);
 	}
 
-	XYPairs<FloatType> getTrainingData() {
+	TrainingDataCollection<FloatType> getTrainingData() {
 		return trainingData;
 	}
 
-	XYPairs<FloatType> getValidationData() {
+	TrainingDataCollection<FloatType> getValidationData() {
 		return validationData;
 	}
 
-	public XYPairs<FloatType> getLabeledTrainingPairs() {
+	public TrainingDataCollection<FloatType> getLabeledTrainingPairs() {
 		return trainingLabeled;
 	}
 

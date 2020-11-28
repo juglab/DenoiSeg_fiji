@@ -28,28 +28,9 @@
  */
 package de.csbdresden.denoiseg.train;
 
-import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.converter.Converter;
-import net.imglib2.converter.Converters;
 import net.imglib2.type.numeric.RealType;
-import net.imglib2.type.numeric.real.FloatType;
-import net.imglib2.util.Pair;
-import net.imglib2.util.ValuePair;
 
-class TrainUtils {
+import java.util.ArrayList;
 
-	private static <T extends RealType<T>> RandomAccessibleInterval<FloatType> normalizeConverter(RandomAccessibleInterval<T> data, FloatType mean, FloatType stdDev) {
-		Converter<? super T, ? super FloatType> converter = (Converter<T, FloatType>) (input, output)
-				-> output.set((input.getRealFloat() - mean.get())/stdDev.get());
-		return Converters.convert(data, converter, new FloatType());
-	}
-
-	static void normalize(TrainingDataCollection<FloatType> trainingData, FloatType mean, FloatType stdDev) {
-		for (int i = 0; i < trainingData.size(); i++) {
-			TrainingData<FloatType> data = trainingData.get(i);
-			TrainingData<FloatType> newData = new TrainingData<>(
-					TrainUtils.normalizeConverter(data.input, mean, stdDev), data.outSegment);
-			trainingData.set(i, newData);
-		}
-	}
+public class ProcessedTrainingDataCollection<T extends RealType<T>> extends ArrayList<ProcessedTrainingData<T>> {
 }

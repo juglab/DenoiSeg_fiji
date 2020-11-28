@@ -52,23 +52,23 @@ public class TrainingTest {
 
 		ImageJ ij = new ImageJ();
 		ij.ui().setHeadless(true);
-		Img<FloatType> trainingBatches = ij.op().create().img(new FinalDimensions(32, 32, 32), new FloatType());
 		Random random = new Random();
-		trainingBatches.forEach(pix -> pix.set(random.nextFloat()));
-		Img<FloatType> predictionBatches = ij.op().create().img(new FinalDimensions(32, 32, 4), new FloatType());
-		predictionBatches.forEach(pix -> pix.set(random.nextFloat()));
 
 		DenoiSegTraining training = new DenoiSegTraining(ij.context());
 		training.init(new DenoiSegConfig()
-			.setBatchSize(10)
+			.setBatchSize(64)
 			.setNumEpochs(2)
 			.setStepsPerEpoch(2)
 			.setPatchShape(32)
 			.setNeighborhoodRadius(5));
 		for (int i = 0; i < 20; i++) {
-			Img<FloatType> raw = ij.op().create().img(new FinalDimensions(32, 32), new FloatType());
+			Img<FloatType> raw = ij.op().create().img(new FinalDimensions(322, 322), new FloatType());
+			raw.forEach(pix -> pix.set(random.nextFloat()));
 			Img<IntType> labeling = null;
-			if(i < 5) labeling = ij.op().create().img(new FinalDimensions(32, 32), new IntType());
+			if(i < 5) {
+				labeling = ij.op().create().img(new FinalDimensions(322, 322), new IntType());
+				labeling.forEach(pix -> pix.add(new IntType(random.nextFloat() > 0.5 ? 1 : 0 )));
+			}
 			training.input().addTrainingData(raw, labeling);
 			training.input().addValidationData(raw, labeling);
 		}

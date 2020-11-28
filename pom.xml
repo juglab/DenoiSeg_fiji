@@ -81,6 +81,8 @@
 		<license.copyrightOwners>Center for Systems Biology Dresden</license.copyrightOwners>
 		<tensorflow.version>1.15.0</tensorflow.version>
 		<imagej-tensorflow.version>1.1.6</imagej-tensorflow.version>
+		<imagej-modelzoo.version>0.9.2</imagej-modelzoo.version>
+		<n2v.version>0.8.0</n2v.version>
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
 	</properties>
@@ -100,16 +102,12 @@
 		<dependency>
 			<groupId>de.csbdresden</groupId>
 			<artifactId>n2v</artifactId>
-			<version>0.7.1</version>
+			<version>${n2v.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej-modelzoo</artifactId>
-			<version>0.8.1</version>
-		</dependency>
-		<dependency>
-			<groupId>commons-io</groupId>
-			<artifactId>commons-io</artifactId>
+			<version>${imagej-modelzoo.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.scif</groupId>

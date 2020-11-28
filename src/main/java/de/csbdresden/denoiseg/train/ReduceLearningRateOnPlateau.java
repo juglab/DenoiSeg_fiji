@@ -54,8 +54,8 @@ public class ReduceLearningRateOnPlateau {
 			cooldown_counter -= 1;
 			wait = 0;
 		}
-		if(monitorOp.accept(training.output().getCurrentValidationSegLoss(), best)) {
-			best = training.output().getCurrentValidationSegLoss();
+		if(monitorOp.accept(training.output().getCurrentValidationLoss(), best)) {
+			best = training.output().getCurrentValidationLoss();
 			wait = 0;
 		} else {
 			if(!inCooldown()) {
