@@ -83,7 +83,7 @@
 		<imagej-tensorflow.version>1.1.6</imagej-tensorflow.version>
 		<imagej-modelzoo.version>0.9.7</imagej-modelzoo.version>
 		<n2v.version>0.8.3</n2v.version>
-		<java-bioimage-io.version>0.3.4</java-bioimage-io.version>
+		<java-bioimage-io.version>0.3.5</java-bioimage-io.version>
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
 	</properties>
