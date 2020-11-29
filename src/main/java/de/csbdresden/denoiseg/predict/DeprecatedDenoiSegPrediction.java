@@ -28,46 +28,77 @@
  */
 package de.csbdresden.denoiseg.predict;
 
-import net.imagej.ImageJ;
+import de.csbdresden.n2v.util.N2VUtils;
+import io.scif.img.converters.RandomAccessConverter;
 import net.imagej.modelzoo.consumer.ModelZooPrediction;
-import net.imagej.modelzoo.consumer.ModelZooPredictionOptions;
 import net.imagej.modelzoo.consumer.model.ModelZooModel;
 import net.imagej.modelzoo.consumer.model.node.ImageDataReference;
+import net.imagej.modelzoo.consumer.model.node.InputImageNode;
+import net.imagej.modelzoo.consumer.model.node.ModelZooNode;
+import net.imagej.modelzoo.consumer.model.node.OutputImageNode;
 import net.imagej.modelzoo.consumer.sanitycheck.SanityCheck;
-import net.imagej.ops.OpService;
+import net.imagej.modelzoo.plugin.transformation.postprocessing.ScaleLinearPostprocessing;
+import net.imagej.modelzoo.plugin.transformation.preprocessing.ZeroMeanUnitVariancePreprocessing;
 import net.imglib2.FinalInterval;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.loops.LoopBuilder;
+import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.util.Intervals;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import org.scijava.Context;
-import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
-
-import java.io.File;
 
 @Plugin(type = ModelZooPrediction.class, name = "denoiseg")
 public class DeprecatedDenoiSegPrediction extends DenoiSegPrediction {
 
-	@Parameter
-	private OpService opService;
-
-	@Parameter
-	private Context context;
-
+	public DeprecatedDenoiSegPrediction() {
+		super();
+	}
 	public DeprecatedDenoiSegPrediction(Context context) {
 		super(context);
 	}
 
 	@Override
 	protected DenoiSegOutput<?, ?> createOutput(ModelZooModel model) {
-		ImageDataReference<?> data = (ImageDataReference<?>) model.getOutputNodes().get(0).getData();
-		IntervalView denoised = getFirstChannel(data.getData());
+		ModelZooNode<?> modelZooNode = model.getOutputNodes().get(0);
+		ImageDataReference<?> data = (ImageDataReference<?>) modelZooNode.getData();
+		RandomAccessibleInterval denoised = getFirstChannel(data.getData());
+		ZeroMeanUnitVariancePreprocessing preprocessor = (ZeroMeanUnitVariancePreprocessing) model.getInputNodes().get(0).getProcessors().get(0);
+		denoised = denormalize(modelZooNode, denoised, data, preprocessor.getStdDev().floatValue(), preprocessor.getMean().floatValue());
 		IntervalView segmented = getSegmentationChannels(data.getData());
 		clip(segmented);
 		return new DenoiSegOutput<>(denoised, segmented);
+	}
+
+	private <O extends RealType<O> & NativeType<O>> RandomAccessibleInterval denormalize(ModelZooNode<?> modelZooNode, RandomAccessibleInterval<O> in, ImageDataReference<O> outType, float gain, float offset) {
+		InputImageNode inputReference = ((OutputImageNode) modelZooNode).getReference();
+		O resOutType = outType.getDataType();
+		if(inputReference != null && getOptions().values.convertIntoInputFormat()) {
+			resOutType = inputReference.getOriginalDataType();
+		}
+		RandomAccessibleInterval<O> out;
+		if(sameType(outType.getDataType(), resOutType)) {
+			out = outType.getData();
+		} else {
+			out = opService.create().img(in, resOutType);
+		}
+		O finalResOutType = resOutType;
+		LoopBuilder.setImages(in, out).forEachPixel((i, o) -> {
+			double real = i.getRealDouble() * gain + offset;
+			o.setReal(inBounds(real, finalResOutType));
+		});
+		return out;
+	}
+
+	private <T extends RealType<T> & NativeType<T>> double inBounds(double value, T resOutType) {
+		return Math.min(Math.max(resOutType.getMinValue(), value), resOutType.getMaxValue());
+	}
+
+
+	protected <I extends RealType<I> & NativeType<I>, O extends RealType<O> & NativeType<O>> boolean sameType(I inType, O outType) {
+		return inType.getClass().equals(outType);
 	}
 
 	private <T extends RealType<T>> void clip(RandomAccessibleInterval<T> img) {

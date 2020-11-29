@@ -28,10 +28,8 @@
  */
 package de.csbdresden.denoiseg.predict;
 
-import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.AbstractModelZooPrediction;
-import net.imagej.modelzoo.consumer.ModelZooPredictionOptions;
 import net.imagej.modelzoo.consumer.SingleImagePrediction;
 import net.imagej.modelzoo.consumer.model.ModelZooModel;
 import net.imagej.modelzoo.consumer.model.node.ImageDataReference;
@@ -44,12 +42,10 @@ import net.imglib2.type.numeric.RealType;
 import org.scijava.Context;
 import org.scijava.plugin.Parameter;
 
-import java.io.File;
-
 public class DenoiSegPrediction extends AbstractModelZooPrediction<ImageInput<?>, DenoiSegOutput<?, ?>> implements SingleImagePrediction<DenoiSegOutput<?, ?>> {
 
 	@Parameter
-	private OpService opService;
+	OpService opService;
 
 	@Parameter
 	private Context context;

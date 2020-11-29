@@ -81,8 +81,9 @@
 		<license.copyrightOwners>Center for Systems Biology Dresden</license.copyrightOwners>
 		<tensorflow.version>1.15.0</tensorflow.version>
 		<imagej-tensorflow.version>1.1.6</imagej-tensorflow.version>
-		<imagej-modelzoo.version>0.9.4</imagej-modelzoo.version>
-		<n2v.version>0.8.0</n2v.version>
+		<imagej-modelzoo.version>0.9.7</imagej-modelzoo.version>
+		<n2v.version>0.8.3</n2v.version>
+		<java-bioimage-io.version>0.3.4</java-bioimage-io.version>
 		<!-- NB: Deploy releases to the SciJava Maven repository. -->
 		<releaseProfiles>deploy-to-scijava</releaseProfiles>
 	</properties>
@@ -108,6 +109,11 @@
 			<groupId>net.imagej</groupId>
 			<artifactId>imagej-modelzoo</artifactId>
 			<version>${imagej-modelzoo.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.bioimage</groupId>
+			<artifactId>java-bioimage-io</artifactId>
+			<version>${java-bioimage-io.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>io.scif</groupId>

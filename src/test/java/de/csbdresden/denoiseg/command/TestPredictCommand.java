@@ -29,6 +29,7 @@
 package de.csbdresden.denoiseg.command;
 
 import net.imagej.ImageJ;
+import net.imagej.modelzoo.consumer.command.DefaultSingleImagePredictionCommand;
 import net.imglib2.RandomAccessibleInterval;
 import org.junit.Test;
 import org.scijava.command.CommandModule;
@@ -49,12 +50,12 @@ public class TestPredictCommand {
 
 		RandomAccessibleInterval _input = ij.op().create().img(new int[]{20, 20});
 
-		CommandModule plugin = ij.command().run( DenoiSegPredictCommand.class, false
+		CommandModule plugin = ij.command().run( DefaultSingleImagePredictionCommand.class, false
 				,"input", _input, "modelFile", new File(modelPath)
 		).get();
 
-		assertNotNull( plugin.getOutput(DenoiSegPredictCommand.getOutputSegmentedName()) );
-		assertNotNull( plugin.getOutput(DenoiSegPredictCommand.getOutputDenoisedName()) );
+		assertNotNull( plugin.getOutput("output") );
+		assertNotNull( plugin.getOutput("output1") );
 
 		ij.dispose();
 
