@@ -101,9 +101,9 @@ public class DenoiSegTraining implements ModelZooTraining {
 	private static final String trainingFeedSampleWeightsSegmentOp = "out_segment_sample_weights";
 	private static final String trainingFeedLearningPhaseOp = "keras_learning_phase";
 	// training fetch
-	private static final String trainingFetchLossOp = "loss_denoiseg";
-	private static final String trainingFetchSegLossOp = "loss_segment";
-	private static final String trainingFetchDenoiseLossOp = "loss_denoise";
+	private static final String trainingFetchLossOp = "loss_tensor";
+	private static final String trainingFetchSegLossOp = "out_segment_loss_tensor";
+	private static final String trainingFetchDenoiseLossOp = "out_denoise_loss_tensor";
 	private static final String trainingFetchLearningOp = "read_learning_rate";
 	private static final String lrAssignOpName = "write_learning_rate";
 	// training target
@@ -111,8 +111,8 @@ public class DenoiSegTraining implements ModelZooTraining {
 	// prediction feed
 	static final String predictionFeedInputOp = trainingFeedXOp;
 	// prediction target
-	static final String predictionTargetDenoiseOp = "output_denoised";
-	static final String predictionTargetSegmentOp = "output_segmented";
+	static final String predictionTargetDenoiseOp = "denoised";
+	static final String predictionTargetSegmentOp = "segmented";
 	// validation target
 	private static final String validationTargetOp = "validation";
 
