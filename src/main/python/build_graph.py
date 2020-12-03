@@ -26,12 +26,6 @@ def rename_tensor(name_in, name_out):
     tf.identity(var, name=name_out)
 
 
-def rename_tensor_directly(tensor, name_out):
-    print("  " + name_out + " (" + tensor.name + ")")
-    var = tf.get_default_graph().get_tensor_by_name(tensor.name)
-    tf.identity(var, name=name_out)
-
-
 def rename_op(name_in, name_out):
     print("  " + name_out + " (" + name_in + ")")
     op = tf.get_default_graph().get_operation_by_name(name_in)
