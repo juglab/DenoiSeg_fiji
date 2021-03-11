@@ -29,6 +29,7 @@
 package de.csbdresden.denoiseg.train;
 
 import de.csbdresden.n2v.ui.TrainingProgress;
+import io.scif.services.DatasetIOService;
 import net.imagej.modelzoo.consumer.converter.RealIntConverter;
 import net.imagej.ops.OpService;
 import net.imglib2.RandomAccessibleInterval;
@@ -42,8 +43,6 @@ import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Intervals;
-import net.imglib2.util.Pair;
-import net.imglib2.util.ValuePair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import net.imglib2.view.composite.Composite;
@@ -70,6 +69,10 @@ public class InputHandler {
 
 	@Parameter
 	private IOService ioService;
+
+	// TODO remove when bumped to scifio v 0.41.2
+	@Parameter
+	private DatasetIOService datasetIOService;
 
 	@Parameter
 	private EventService eventService;
@@ -155,7 +158,11 @@ public class InputHandler {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
-			Img image = (Img) ioService.open(file.getAbsolutePath());
+
+			// TODO roll-back when scifio version 0.41.2
+			//Img image = (Img) ioService.open(file.getAbsolutePath());
+			Img image = (Img) datasetIOService.open(file.getAbsolutePath());
+
 			if(image == null) continue;
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, trainingLabelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
@@ -178,7 +185,11 @@ public class InputHandler {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
-			Img image = (Img) ioService.open(file.getAbsolutePath());
+
+			// TODO roll-back when scifio version 0.41.2
+			//Img image = (Img) ioService.open(file.getAbsolutePath());
+			Img image = (Img) datasetIOService.open(file.getAbsolutePath());
+
 			if(image == null) continue;
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, labelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
@@ -193,7 +204,10 @@ public class InputHandler {
 			if(canceled) break;
 			if(rawFile.getName().equals(labeling.getName())) {
 				try {
-					RandomAccessibleInterval label = (Img) ioService.open(labeling.getAbsolutePath());
+					// TODO roll-back when scifio version 0.41.2
+					//RandomAccessibleInterval label = (Img) ioService.open(labeling.getAbsolutePath());
+					RandomAccessibleInterval label = (Img) datasetIOService.open(labeling.getAbsolutePath());
+
 					return convertToInt(label);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -272,7 +286,11 @@ public class InputHandler {
 		for (File file : validationRawData.listFiles()) {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
-			Img image = (Img) ioService.open(file.getAbsolutePath());
+
+			// TODO roll-back when scifio version 0.41.2
+			//Img image = (Img) ioService.open(file.getAbsolutePath());
+			Img image = (Img) datasetIOService.open(file.getAbsolutePath());
+
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, validationLabelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
 			addValidationData(imageFloat, labeling);
