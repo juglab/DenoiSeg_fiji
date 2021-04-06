@@ -359,6 +359,10 @@ public class InputHandler {
 	}
 
 
+	/**
+	 * FileFilter used to ignore .DS_Store files when loading images. The .DS_Store files
+	 * are macOS specific.
+	 */
 	private class DSStoreFilter implements FileFilter {
 
 		@Override
