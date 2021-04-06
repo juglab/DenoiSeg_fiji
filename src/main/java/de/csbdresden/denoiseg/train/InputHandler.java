@@ -54,6 +54,7 @@ import org.scijava.log.LogService;
 import org.scijava.plugin.Parameter;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,7 +155,7 @@ public class InputHandler {
 
 		unregisterIOEvent();
 
-		for (File file : trainingRawData.listFiles()) {
+		for (File file : trainingRawData.listFiles(new DSStoreFilter())) {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
@@ -179,7 +180,7 @@ public class InputHandler {
 
 		unregisterIOEvent();
 
-		List<File> files = Arrays.asList(Objects.requireNonNull(rawData.listFiles()));
+		List<File> files = Arrays.asList(Objects.requireNonNull(rawData.listFiles(new DSStoreFilter())));
 		Collections.shuffle(files);
 		for (File file : files) {
 			if(canceled) break;
@@ -200,7 +201,7 @@ public class InputHandler {
 	}
 
 	private RandomAccessibleInterval<IntType> getLabeling(File rawFile, File labelingDirectory) {
-		for (File labeling : labelingDirectory.listFiles()) {
+		for (File labeling : labelingDirectory.listFiles(new DSStoreFilter())) {
 			if(canceled) break;
 			if(rawFile.getName().equals(labeling.getName())) {
 				try {
@@ -283,7 +284,7 @@ public class InputHandler {
 
 		unregisterIOEvent();
 
-		for (File file : validationRawData.listFiles()) {
+		for (File file : validationRawData.listFiles(new DSStoreFilter())) {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 
@@ -355,5 +356,16 @@ public class InputHandler {
 
 	public void cancel() {
 		this.canceled = true;
+	}
+
+
+	private class DSStoreFilter implements FileFilter {
+
+		@Override
+		public boolean accept(File file) {
+			if(file.getName().equals(".DS_Store")) return false;
+
+			return true;
+		}
 	}
 }
