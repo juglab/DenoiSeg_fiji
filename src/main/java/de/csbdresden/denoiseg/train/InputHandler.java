@@ -29,6 +29,7 @@
 package de.csbdresden.denoiseg.train;
 
 import de.csbdresden.n2v.ui.TrainingProgress;
+import io.scif.services.DatasetIOService;
 import net.imagej.modelzoo.consumer.converter.RealIntConverter;
 import net.imagej.ops.OpService;
 import net.imglib2.RandomAccessibleInterval;
@@ -42,8 +43,6 @@ import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Intervals;
-import net.imglib2.util.Pair;
-import net.imglib2.util.ValuePair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 import net.imglib2.view.composite.Composite;
@@ -55,6 +54,7 @@ import org.scijava.log.LogService;
 import org.scijava.plugin.Parameter;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -151,11 +151,13 @@ public class InputHandler {
 
 		unregisterIOEvent();
 
-		for (File file : trainingRawData.listFiles()) {
+		for (File file : trainingRawData.listFiles(new DSStoreFilter())) {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
+
 			Img image = (Img) ioService.open(file.getAbsolutePath());
+
 			if(image == null) continue;
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, trainingLabelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
@@ -172,13 +174,15 @@ public class InputHandler {
 
 		unregisterIOEvent();
 
-		List<File> files = Arrays.asList(Objects.requireNonNull(rawData.listFiles()));
+		List<File> files = Arrays.asList(Objects.requireNonNull(rawData.listFiles(new DSStoreFilter())));
 		Collections.shuffle(files);
 		for (File file : files) {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
+
 			Img image = (Img) ioService.open(file.getAbsolutePath());
+
 			if(image == null) continue;
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, labelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
@@ -189,11 +193,12 @@ public class InputHandler {
 	}
 
 	private RandomAccessibleInterval<IntType> getLabeling(File rawFile, File labelingDirectory) {
-		for (File labeling : labelingDirectory.listFiles()) {
+		for (File labeling : labelingDirectory.listFiles(new DSStoreFilter())) {
 			if(canceled) break;
 			if(rawFile.getName().equals(labeling.getName())) {
 				try {
 					RandomAccessibleInterval label = (Img) ioService.open(labeling.getAbsolutePath());
+
 					return convertToInt(label);
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -269,10 +274,12 @@ public class InputHandler {
 
 		unregisterIOEvent();
 
-		for (File file : validationRawData.listFiles()) {
+		for (File file : validationRawData.listFiles(new DSStoreFilter())) {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
+
 			Img image = (Img) ioService.open(file.getAbsolutePath());
+
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, validationLabelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
 			addValidationData(imageFloat, labeling);
@@ -337,5 +344,20 @@ public class InputHandler {
 
 	public void cancel() {
 		this.canceled = true;
+	}
+
+
+	/**
+	 * FileFilter used to ignore .DS_Store files when loading images. The .DS_Store files
+	 * are macOS specific.
+	 */
+	private class DSStoreFilter implements FileFilter {
+
+		@Override
+		public boolean accept(File file) {
+			if(file.getName().equals(".DS_Store")) return false;
+
+			return true;
+		}
 	}
 }
