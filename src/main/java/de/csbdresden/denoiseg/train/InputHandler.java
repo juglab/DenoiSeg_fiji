@@ -71,10 +71,6 @@ public class InputHandler {
 	@Parameter
 	private IOService ioService;
 
-	// TODO remove when bumped to scifio v 0.41.2
-	@Parameter
-	private DatasetIOService datasetIOService;
-
 	@Parameter
 	private EventService eventService;
 
@@ -160,9 +156,7 @@ public class InputHandler {
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
 
-			// TODO roll-back when scifio version 0.41.2
-			//Img image = (Img) ioService.open(file.getAbsolutePath());
-			Img image = (Img) datasetIOService.open(file.getAbsolutePath());
+			Img image = (Img) ioService.open(file.getAbsolutePath());
 
 			if(image == null) continue;
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, trainingLabelingData);
@@ -187,9 +181,7 @@ public class InputHandler {
 			if(file.isDirectory()) continue;
 //					System.out.println(file.getAbsolutePath());
 
-			// TODO roll-back when scifio version 0.41.2
-			//Img image = (Img) ioService.open(file.getAbsolutePath());
-			Img image = (Img) datasetIOService.open(file.getAbsolutePath());
+			Img image = (Img) ioService.open(file.getAbsolutePath());
 
 			if(image == null) continue;
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, labelingData);
@@ -205,9 +197,7 @@ public class InputHandler {
 			if(canceled) break;
 			if(rawFile.getName().equals(labeling.getName())) {
 				try {
-					// TODO roll-back when scifio version 0.41.2
-					//RandomAccessibleInterval label = (Img) ioService.open(labeling.getAbsolutePath());
-					RandomAccessibleInterval label = (Img) datasetIOService.open(labeling.getAbsolutePath());
+					RandomAccessibleInterval label = (Img) ioService.open(labeling.getAbsolutePath());
 
 					return convertToInt(label);
 				} catch (IOException e) {
@@ -288,9 +278,7 @@ public class InputHandler {
 			if(canceled) break;
 			if(file.isDirectory()) continue;
 
-			// TODO roll-back when scifio version 0.41.2
-			//Img image = (Img) ioService.open(file.getAbsolutePath());
-			Img image = (Img) datasetIOService.open(file.getAbsolutePath());
+			Img image = (Img) ioService.open(file.getAbsolutePath());
 
 			RandomAccessibleInterval<IntType> labeling = getLabeling(file, validationLabelingData);
 			RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
