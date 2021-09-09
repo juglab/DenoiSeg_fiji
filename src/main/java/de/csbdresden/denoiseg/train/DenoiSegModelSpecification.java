@@ -85,7 +85,7 @@ public class DenoiSegModelSpecification extends ImageJModelSpecification {
 	private void setWeights(DenoiSegOutputHandler outputHandler) {
 		WeightsSpecification weights = new TensorFlowSavedModelBundleSpecification();
 		weights.setSource(outputHandler.getSavedModelBundlePackage());
-		addWeights(weights);
+		addWeights(TensorFlowSavedModelBundleSpecification.id, weights);
 	}
 
 	private void setTraining(DenoiSegConfig config, int stepsFinished) {
